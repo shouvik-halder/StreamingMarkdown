@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="StreamingMarkdown.Core.Tests/StreamingMarkdown.Core.Tests.csproj" />
+  <Project Path="StreamingMarkdown.Core/StreamingMarkdown.Core.csproj" />
+  <Project Path="StreamingMarkdown.Maui.TestApp/StreamingMarkdown.Maui.TestApp.csproj" />
+  <Project Path="StreamingMarkdown.Maui/StreamingMarkdown.Maui.csproj" />
+</Solution>

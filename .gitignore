@@ -1,0 +1,166 @@
+# =========================
+# .NET / Visual Studio
+# =========================
+
+# Build output
+bin/
+obj/
+
+# Visual Studio cache
+.vs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+
+# Rider / ReSharper
+.idea/
+*.sln.iml
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# =========================
+# .NET / NuGet
+# =========================
+
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+project.assets.json
+project.nuget.cache
+*.nuget.props
+*.nuget.targets
+
+# =========================
+# .NET MAUI
+# =========================
+
+# Generated MAUI files
+**/Platforms/Android/bin/
+**/Platforms/Android/obj/
+**/Platforms/iOS/bin/
+**/Platforms/iOS/obj/
+**/Platforms/MacCatalyst/bin/
+**/Platforms/MacCatalyst/obj/
+**/Platforms/Windows/bin/
+**/Platforms/Windows/obj/
+
+# MAUI generated resources
+**/Resources/Raw/**/*
+!**/Resources/Raw/.gitkeep
+
+# =========================
+# Android
+# =========================
+
+# Android build files
+*.apk
+*.aab
+*.apks
+
+# Android Studio
+.gradle/
+*.jks
+*.keystore
+
+# Android generated folders
+**/android/
+**/Android/bin/
+**/Android/obj/
+
+# =========================
+# iOS / Mac Catalyst
+# =========================
+
+# Xcode generated files
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Xcode user data
+xcuserdata/
+
+# iOS build artifacts
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# =========================
+# macOS
+# =========================
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Finder metadata
+._*
+
+# =========================
+# VS Code
+# =========================
+
+.vscode/
+
+# Keep shared VS Code settings if you want them
+# !.vscode/settings.json
+# !.vscode/tasks.json
+# !.vscode/launch.json
+
+# =========================
+# Logs
+# =========================
+
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# Temporary files
+# =========================
+
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+*.bak
+
+# =========================
+# Test / Coverage
+# =========================
+
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# =========================
+# Local configuration
+# =========================
+
+.env
+.env.*
+!.env.example
+
+# =========================
+# Certificates / Secrets
+# =========================
+
+*.p12
+*.pfx
+*.cer
+*.crt
+
+# =========================
+# OS / IDE files
+# =========================
+
+Thumbs.db
+ehthumbs.db
+Desktop.ini

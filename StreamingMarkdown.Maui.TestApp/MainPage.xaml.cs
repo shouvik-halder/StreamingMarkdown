@@ -215,64 +215,223 @@ public partial class MainPage : ContentPage
         Content =
             _markdownView;
 
-        TestViewReuse();
+        TestQuotes();
     }
 
     private void TestViewReuse()
-    {
-        _processor.Begin();
+{
+    _processor.Begin();
 
-        var firstUpdate =
-            _processor.Append(
-                "First paragraph\n\nSecond paragraph");
+    var firstUpdate =
+        _processor.Append(
+            "First paragraph\n\nSecond paragraph");
 
-        _markdownView.ApplyUpdate(
-            firstUpdate);
+    _markdownView.ApplyUpdate(
+        firstUpdate);
 
-        var secondUpdate =
-    _processor.Append(
-        "!\n\nThird paragraph");
+    var layout =
+        GetLayout();
 
-_markdownView.ApplyUpdate(
-    secondUpdate);
+    Assert(
+        layout.Children.Count == 2,
+        "Expected two rendered blocks.");
 
-        var scrollView =
-            (ScrollView)_markdownView.Content!;
+    var firstView =
+        layout.Children[0];
 
-        var layout =
-            (VerticalStackLayout)scrollView.Content!;
+    var secondView =
+        layout.Children[1];
 
-        var firstView =
-            layout.Children[0];
+    var secondUpdate =
+        _processor.Append(
+            "!");
 
-        var secondView =
-            layout.Children[1];
+    _markdownView.ApplyUpdate(
+        secondUpdate);
 
-            var firstViewAfter =
-    layout.Children[0];
+    var firstViewAfter =
+        layout.Children[0];
 
-var secondViewAfter =
-    layout.Children[1];
+    var secondViewAfter =
+        layout.Children[1];
 
-var thirdView =
-    layout.Children[2];
+    Assert(
+        ReferenceEquals(
+            firstView,
+            firstViewAfter),
+        "Unchanged first block should reuse its View.");
 
-    Debug.Assert(
+    Assert(
     ReferenceEquals(
-        firstView,
-        firstViewAfter));
-
-        Debug.Assert(
-    !ReferenceEquals(
         secondView,
-        secondViewAfter));
+        secondViewAfter),
+    "Modified block should reuse its existing View.");
 
-        Debug.Assert(
-    thirdView is Label);
+    System.Diagnostics.Debug.WriteLine(
+        "View reuse test passed.");
+}
 
-        System.Diagnostics.Debug.WriteLine(
-            $"Initial views: {layout.Children.Count}");
+private void TestHeadingViewReuse()
+{
+    _processor.Begin();
 
-        // More tests here...
+    var firstUpdate =
+        _processor.Append(
+            "# Hello");
+
+    _markdownView.ApplyUpdate(
+        firstUpdate);
+
+    var layout =
+        GetLayout();
+
+    Assert(
+        layout.Children.Count == 1,
+        "Expected one rendered block.");
+
+    var firstView =
+        layout.Children[0];
+
+    var secondUpdate =
+        _processor.Append(
+            " World");
+
+    _markdownView.ApplyUpdate(
+        secondUpdate);
+
+    var secondView =
+        layout.Children[0];
+
+    Assert(
+        ReferenceEquals(
+            firstView,
+            secondView),
+        "Modified heading should reuse its existing View.");
+
+    Debug.WriteLine(
+        "Heading view reuse test passed.");
+}
+
+private void TestLists()
+{
+    var markdown = """
+# Unordered List
+
+- Apple
+- **Banana**
+- *Orange*
+- [OpenAI](https://openai.com)
+
+# Ordered List
+
+1. First item
+2. **Second item**
+3. *Third item*
+4. [OpenAI](https://openai.com)
+""";
+
+    var parser =
+        new MarkdigMarkdownParser();
+
+    var document =
+        parser.Parse(markdown);
+
+    _markdownView.Document =
+        document;
+}    
+
+private void TestListViewReuse()
+{
+    _processor.Begin();
+
+    var firstUpdate =
+        _processor.Append(
+            "- First\n- Sec");
+
+    _markdownView.ApplyUpdate(
+        firstUpdate);
+
+    var layout =
+        GetLayout();
+
+    Assert(
+        layout.Children.Count == 1,
+        "Expected one rendered list block.");
+
+    var firstView =
+        layout.Children[0];
+
+    var secondUpdate =
+        _processor.Append(
+            "ond\n- Third");
+
+    _markdownView.ApplyUpdate(
+        secondUpdate);
+
+    var secondView =
+        layout.Children[0];
+
+    Assert(
+        ReferenceEquals(
+            firstView,
+            secondView),
+        "Modified list should reuse its existing View.");
+
+    Assert(
+        layout.Children.Count == 1,
+        "Expected one list block after update.");
+
+    Debug.WriteLine(
+        "List view reuse test passed.");
+}
+
+private void TestQuotes()
+{
+    var markdown = """
+# Quotes
+
+> This is a simple quote.
+
+> This quote contains **bold text**.
+
+> This quote contains *italic text*.
+
+> Visit [OpenAI](https://openai.com).
+""";
+
+    var parser =
+        new MarkdigMarkdownParser();
+
+    var document =
+        parser.Parse(markdown);
+
+    _markdownView.Document =
+        document;
+}
+
+
+
+
+
+
+
+private VerticalStackLayout GetLayout()
+{
+    var scrollView =
+        (ScrollView)_markdownView.Content!;
+
+    return (VerticalStackLayout)
+        scrollView.Content!;
+}
+
+private static void Assert(
+    bool condition,
+    string message)
+{
+    if (!condition)
+    {
+        throw new InvalidOperationException(
+            message);
     }
+}
 }

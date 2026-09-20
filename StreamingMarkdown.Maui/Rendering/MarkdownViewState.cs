@@ -1,14 +1,17 @@
 using StreamingMarkdown.Core.Models.Blocks;
+using StreamingMarkdown.Maui.Rendering.Views;
 
 namespace StreamingMarkdown.Maui.Rendering;
 
 internal sealed class MarkdownViewState
 {
-    private readonly Dictionary<Guid, View> _views = new();
+    private readonly Dictionary<
+        Guid,
+        IMarkdownBlockView> _views = new();
 
     public bool TryGetView(
         Guid blockId,
-        out View? view)
+        out IMarkdownBlockView? view)
     {
         return _views.TryGetValue(
             blockId,
@@ -17,7 +20,7 @@ internal sealed class MarkdownViewState
 
     public void SetView(
         MarkdownBlock block,
-        View view)
+        IMarkdownBlockView view)
     {
         ArgumentNullException.ThrowIfNull(block);
         ArgumentNullException.ThrowIfNull(view);
@@ -28,7 +31,8 @@ internal sealed class MarkdownViewState
     public bool RemoveView(
         Guid blockId)
     {
-        return _views.Remove(blockId);
+        return _views.Remove(
+            blockId);
     }
 
     public void Clear()

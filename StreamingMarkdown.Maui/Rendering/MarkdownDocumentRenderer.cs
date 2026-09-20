@@ -1,5 +1,6 @@
 using StreamingMarkdown.Core.Models;
 using StreamingMarkdown.Core.Models.Blocks;
+using StreamingMarkdown.Maui.Rendering.Views;
 using StreamingMarkdown.Maui.Styling;
 
 namespace StreamingMarkdown.Maui.Rendering;
@@ -12,7 +13,8 @@ public sealed class MarkdownDocumentRenderer
         MarkdownStyle? style = null)
     {
         _blockRenderer =
-            new MarkdownBlockRenderer(style);
+            new MarkdownBlockRenderer(
+                style);
     }
 
     public View Render(
@@ -28,23 +30,25 @@ public sealed class MarkdownDocumentRenderer
 
         foreach (var block in document.Blocks)
         {
-            var view =
+            var blockView =
                 RenderBlock(block);
 
-            if (view is not null)
+            if (blockView is not null)
             {
-                layout.Children.Add(view);
+                layout.Children.Add(
+                    blockView.View);
             }
         }
 
         return layout;
     }
 
-    public View? RenderBlock(
+    internal IMarkdownBlockView? RenderBlock(
         MarkdownBlock block)
     {
         ArgumentNullException.ThrowIfNull(block);
 
-        return _blockRenderer.Render(block);
+        return _blockRenderer.Render(
+            block);
     }
 }

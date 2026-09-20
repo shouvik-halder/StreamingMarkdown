@@ -22,7 +22,7 @@ public sealed class MarkdownView : ContentView
             propertyChanged:
                 OnDocumentChanged);
 
-    public static readonly BindableProperty StyleProperty =
+    public static new readonly BindableProperty StyleProperty =
         BindableProperty.Create(
             nameof(Style),
             typeof(MarkdownStyle),
@@ -43,7 +43,7 @@ public sealed class MarkdownView : ContentView
                 value);
     }
 
-    public MarkdownStyle? Style
+    public new MarkdownStyle? Style
     {
         get =>
             (MarkdownStyle?)GetValue(
@@ -102,35 +102,35 @@ public sealed class MarkdownView : ContentView
             view.Document);
     }
 
-    private void RenderDocument(
-        MarkdownDocument document)
+private void RenderDocument(
+    MarkdownDocument document)
+{
+    _layout.Children.Clear();
+    _state.Clear();
+
+    var renderer =
+        new MarkdownDocumentRenderer(
+            Style);
+
+    foreach (var block in document.Blocks)
     {
-        _layout.Children.Clear();
-        _state.Clear();
+        var blockView =
+            renderer.RenderBlock(
+                block);
 
-        var renderer =
-            new MarkdownDocumentRenderer(
-                Style);
-
-        foreach (var block in document.Blocks)
+        if (blockView is null)
         {
-            var view =
-                renderer.RenderBlock(block);
-
-            if (view is null)
-            {
-                continue;
-            }
-
-            _state.SetView(
-                block,
-                view);
-
-            _layout.Children.Add(
-                view);
+            continue;
         }
-    }
 
+        _state.SetView(
+            block,
+            blockView);
+
+        _layout.Children.Add(
+            blockView.View);
+    }
+}
     public void ApplyUpdate(
     MarkdownUpdate update)
 {
@@ -154,30 +154,29 @@ public sealed class MarkdownView : ContentView
                 Style);
 
         foreach (var change in update.Diff.Changes)
-        {
-            switch (change.Type)
-            {
-                case MarkdownChangeType.Added:
-                    ApplyAdded(
-                        change,
-                        renderer);
+{
+    switch (change.Type)
+    {
+        case MarkdownChangeType.Added:
+            ApplyAdded(
+                change,
+                renderer);
 
-                    break;
+            break;
 
-                case MarkdownChangeType.Removed:
-                    ApplyRemoved(
-                        change);
+        case MarkdownChangeType.Removed:
+            ApplyRemoved(
+                change);
 
-                    break;
+            break;
 
-                case MarkdownChangeType.Modified:
-                    ApplyModified(
-                        change,
-                        renderer);
+        case MarkdownChangeType.Modified:
+            ApplyModified(
+                change);
 
-                    break;
-            }
-        }
+            break;
+    }
+}
 
         ReorderViews(
             update.Document);
@@ -192,138 +191,117 @@ public sealed class MarkdownView : ContentView
     }
 }
 
-    private void ApplyAdded(
-        MarkdownChange change,
-        MarkdownDocumentRenderer renderer)
+private void ApplyAdded(
+    MarkdownChange change,
+    MarkdownDocumentRenderer renderer)
+{
+    if (change.Current is null)
     {
-        if (change.Current is null)
+        return;
+    }
+
+    var blockView =
+        renderer.RenderBlock(
+            change.Current);
+
+    if (blockView is null)
+    {
+        return;
+    }
+
+    _state.SetView(
+        change.Current,
+        blockView);
+}
+private void ApplyRemoved(
+    MarkdownChange change)
+{
+    if (change.Previous is null)
+    {
+        return;
+    }
+
+    if (!_state.TryGetView(
+            change.Previous.Id,
+            out var blockView))
+    {
+        return;
+    }
+
+    _layout.Children.Remove(
+        blockView.View);
+
+    _state.RemoveView(
+        change.Previous.Id);
+}
+private void ApplyModified(
+    MarkdownChange change)
+{
+    if (change.Current is null)
+    {
+        return;
+    }
+
+    if (!_state.TryGetView(
+            change.Current.Id,
+            out var blockView))
+    {
+        var renderer =
+            new MarkdownDocumentRenderer(
+                Style);
+
+        ApplyAdded(
+            change,
+            renderer);
+
+        return;
+    }
+
+    blockView.Update(
+        change.Current);
+}
+private void ReorderViews(
+    MarkdownDocument document)
+{
+    for (var targetIndex = 0;
+         targetIndex < document.Blocks.Count;
+         targetIndex++)
+    {
+        var block =
+            document.Blocks[targetIndex];
+
+        if (!_state.TryGetView(
+                block.Id,
+                out var blockView))
         {
-            return;
+            continue;
+        }
+
+        if (blockView is null)
+        {
+            continue;
         }
 
         var view =
-            renderer.RenderBlock(
-                change.Current);
+            blockView.View;
 
-        if (view is null)
+        var currentIndex =
+            _layout.Children.IndexOf(
+                view);
+
+        if (currentIndex == targetIndex)
         {
-            return;
+            continue;
         }
 
-        _state.SetView(
-            change.Current,
+        if (currentIndex >= 0)
+        {
+            _layout.Children.RemoveAt(
+                currentIndex);
+        }
+
+        _layout.Children.Insert(
+            targetIndex,
             view);
     }
-
-    private void ApplyRemoved(
-        MarkdownChange change)
-    {
-        if (change.Previous is null)
-        {
-            return;
-        }
-
-        if (!_state.TryGetView(
-                change.Previous.Id,
-                out var view))
-        {
-            return;
-        }
-
-        if (view is not null)
-        {
-            _layout.Children.Remove(
-                view);
-        }
-
-        _state.RemoveView(
-            change.Previous.Id);
-    }
-
-    private void ApplyModified(
-        MarkdownChange change,
-        MarkdownDocumentRenderer renderer)
-    {
-        if (change.Current is null)
-        {
-            return;
-        }
-
-        if (!_state.TryGetView(
-                change.Current.Id,
-                out var existingView))
-        {
-            ApplyAdded(
-                change,
-                renderer);
-
-            return;
-        }
-
-        var newView =
-            renderer.RenderBlock(
-                change.Current);
-
-        if (newView is null)
-        {
-            return;
-        }
-
-        var index =
-            _layout.Children.IndexOf(
-                existingView!);
-
-        if (index >= 0)
-        {
-            _layout.Children[
-                index] = newView;
-        }
-
-        _state.SetView(
-            change.Current,
-            newView);
-    }
-
-    private void ReorderViews(
-        MarkdownDocument document)
-    {
-        for (var targetIndex = 0;
-             targetIndex < document.Blocks.Count;
-             targetIndex++)
-        {
-            var block =
-                document.Blocks[targetIndex];
-
-            if (!_state.TryGetView(
-                    block.Id,
-                    out var view))
-            {
-                continue;
-            }
-
-            if (view is null)
-            {
-                continue;
-            }
-
-            var currentIndex =
-                _layout.Children.IndexOf(
-                    view);
-
-            if (currentIndex == targetIndex)
-            {
-                continue;
-            }
-
-            if (currentIndex >= 0)
-            {
-                _layout.Children.RemoveAt(
-                    currentIndex);
-            }
-
-            _layout.Children.Insert(
-                targetIndex,
-                view);
-        }
-    }
-}
+}}

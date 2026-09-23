@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>StreamingMarkdown.Benchmarks.Benchmarks.StreamProcessorBenchmarks-20260923-082419</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.15.8, macOS 27.0 (26A428) [Darwin 27.0.0]
+Apple M3 Pro, 1 CPU, 11 logical and 11 physical cores
+.NET SDK 10.0.300
+  [Host]     : .NET 10.0.8 (10.0.8, 10.0.826.23019), Arm64 RyuJIT armv8.0-a
+  DefaultJob : .NET 10.0.8 (10.0.8, 10.0.826.23019), Arm64 RyuJIT armv8.0-a
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method            </th><th>ChunkCount</th><th>Mean  </th><th>Error</th><th>StdDev</th><th>Median</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th>
+</tr>
+</thead><tbody><tr><td>ProcessSmallChunks</td><td>100</td><td>23.434 &mu;s</td><td>0.3348 &mu;s</td><td>0.3132 &mu;s</td><td>23.497 &mu;s</td><td>7.1411</td><td>0.3357</td><td>-</td><td>58.34 KB</td>
+</tr><tr><td>ProcessNormalChunks</td><td>100</td><td>8.667 &mu;s</td><td>0.1705 &mu;s</td><td>0.1674 &mu;s</td><td>8.638 &mu;s</td><td>3.5858</td><td>0.1526</td><td>-</td><td>29.41 KB</td>
+</tr><tr><td>ProcessMarkdownChunks</td><td>100</td><td>130.581 &mu;s</td><td>2.5736 &mu;s</td><td>2.9637 &mu;s</td><td>129.695 &mu;s</td><td>28.0762</td><td>2.6855</td><td>-</td><td>230.74 KB</td>
+</tr><tr><td>ProcessProgressiveStream</td><td>100</td><td>112.944 &mu;s</td><td>1.8358 &mu;s</td><td>1.5329 &mu;s</td><td>112.400 &mu;s</td><td>87.0361</td><td>9.3994</td><td>-</td><td>711.79 KB</td>
+</tr><tr><td>ProcessSmallChunks</td><td>500</td><td>23.250 &mu;s</td><td>0.3643 &mu;s</td><td>0.3229 &mu;s</td><td>23.238 &mu;s</td><td>7.1411</td><td>0.3357</td><td>-</td><td>58.34 KB</td>
+</tr><tr><td>ProcessNormalChunks</td><td>500</td><td>8.695 &mu;s</td><td>0.1695 &mu;s</td><td>0.1814 &mu;s</td><td>8.683 &mu;s</td><td>3.5858</td><td>0.1526</td><td>-</td><td>29.41 KB</td>
+</tr><tr><td>ProcessMarkdownChunks</td><td>500</td><td>128.905 &mu;s</td><td>2.5498 &mu;s</td><td>3.3155 &mu;s</td><td>127.156 &mu;s</td><td>28.0762</td><td>2.6855</td><td>-</td><td>230.74 KB</td>
+</tr><tr><td>ProcessProgressiveStream</td><td>500</td><td>1,427.815 &mu;s</td><td>28.2552 &mu;s</td><td>54.4381 &mu;s</td><td>1,400.478 &mu;s</td><td>1750.0000</td><td>359.3750</td><td>39.0625</td><td>14335.58 KB</td>
+</tr><tr><td>ProcessSmallChunks</td><td>1000</td><td>24.116 &mu;s</td><td>0.4641 &mu;s</td><td>0.8249 &mu;s</td><td>24.018 &mu;s</td><td>7.1411</td><td>0.3357</td><td>-</td><td>58.34 KB</td>
+</tr><tr><td>ProcessNormalChunks</td><td>1000</td><td>8.655 &mu;s</td><td>0.1729 &mu;s</td><td>0.1775 &mu;s</td><td>8.563 &mu;s</td><td>3.5858</td><td>0.1526</td><td>-</td><td>29.41 KB</td>
+</tr><tr><td>ProcessMarkdownChunks</td><td>1000</td><td>129.526 &mu;s</td><td>2.5135 &mu;s</td><td>2.6894 &mu;s</td><td>128.768 &mu;s</td><td>28.0762</td><td>2.6855</td><td>-</td><td>230.74 KB</td>
+</tr><tr><td>ProcessProgressiveStream</td><td>1000</td><td>4,601.667 &mu;s</td><td>74.9652 &mu;s</td><td>76.9837 &mu;s</td><td>4,583.972 &mu;s</td><td>6812.5000</td><td>187.5000</td><td>31.2500</td><td>55976.34 KB</td>
+</tr></tbody></table>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>StreamingMarkdown.Benchmarks.Benchmarks.TokenStreamBenchmarks-20260923-103425</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.15.8, macOS 27.0 (26A428) [Darwin 27.0.0]
+Apple M3 Pro, 1 CPU, 11 logical and 11 physical cores
+.NET SDK 10.0.300
+  [Host]     : .NET 10.0.8 (10.0.8, 10.0.826.23019), Arm64 RyuJIT armv8.0-a
+  DefaultJob : .NET 10.0.8 (10.0.8, 10.0.826.23019), Arm64 RyuJIT armv8.0-a
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method      </th><th>ChunkCount</th><th>Mean  </th><th>Error</th><th>StdDev</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th>
+</tr>
+</thead><tbody><tr><td>ProcessTokenStream</td><td>100</td><td>72.05 &mu;s</td><td>1.425 &mu;s</td><td>2.302 &mu;s</td><td>31.4941</td><td>1.7090</td><td>-</td><td>257.95 KB</td>
+</tr><tr><td>ProcessTokenStream</td><td>500</td><td>518.67 &mu;s</td><td>9.287 &mu;s</td><td>12.075 &mu;s</td><td>386.7188</td><td>39.0625</td><td>-</td><td>3170.63 KB</td>
+</tr><tr><td>ProcessTokenStream</td><td>1000</td><td>1,466.56 &mu;s</td><td>28.848 &mu;s</td><td>48.986 &mu;s</td><td>1371.0938</td><td>140.6250</td><td>5.8594</td><td>11205.08 KB</td>
+</tr><tr><td>ProcessTokenStream</td><td>5000</td><td>21,130.44 &mu;s</td><td>413.591 &mu;s</td><td>667.872 &mu;s</td><td>30625.0000</td><td>6593.7500</td><td>375.0000</td><td>251244.59 KB</td>
+</tr></tbody></table>
+</body>
+</html>

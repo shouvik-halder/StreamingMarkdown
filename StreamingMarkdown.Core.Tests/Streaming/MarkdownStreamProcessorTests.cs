@@ -2,6 +2,7 @@ using StreamingMarkdown.Core.Diffing;
 using StreamingMarkdown.Core.Models.Blocks;
 using StreamingMarkdown.Core.Models.Inlines;
 using StreamingMarkdown.Core.Parsing;
+using StreamingMarkdown.Core.Results;
 using StreamingMarkdown.Core.Streaming;
 
 namespace StreamingMarkdown.Core.Tests.Streaming;
@@ -338,5 +339,82 @@ public void Append_WhenIncompleteLinkBecomesComplete_ShouldPreserveBlockId()
     Assert.Equal(
         "https://openai.com",
         link.Url);
+}
+
+[Fact]
+public void Begin_ReturnsStreamingResult()
+{
+    var processor = CreateProcessor();
+
+    var update = processor.Begin();
+
+    Assert.Equal(
+        MarkdownStreamResult.Streaming,
+        update.Result);
+
+    processor.Reset();
+}
+
+[Fact]
+public void Complete_ReturnsCompletedResult()
+{
+    var processor = CreateProcessor();
+
+    processor.Begin();
+
+    var update =
+        processor.Complete();
+
+    Assert.Equal(
+        MarkdownStreamResult.Completed,
+        update.Result);
+}
+
+[Fact]
+public void Cancel_ReturnsCancelledResult()
+{
+    var processor = CreateProcessor();
+
+    processor.Begin();
+
+    var update =
+        processor.Cancel();
+
+    Assert.Equal(
+        MarkdownStreamResult.Cancelled,
+        update.Result);
+
+    Assert.False(
+        update.IsCompleted);
+}
+
+[Fact]
+public void Cancel_PreventsFurtherAppend()
+{
+    var processor = CreateProcessor();
+
+    processor.Begin();
+
+    processor.Cancel();
+
+    Assert.Throws<InvalidOperationException>(() =>
+    {
+        processor.Append("Hello");
+    });
+}
+
+[Fact]
+public void Cancel_PreventsComplete()
+{
+    var processor = CreateProcessor();
+
+    processor.Begin();
+
+    processor.Cancel();
+
+    Assert.Throws<InvalidOperationException>(() =>
+    {
+        processor.Complete();
+    });
 }
 }

@@ -53,10 +53,10 @@ public sealed class MarkdownStreamProcessor
             MarkdownDocument.Empty;
 
         return new MarkdownUpdate(
-            _context.Document,
-            MarkdownDiff.Empty,
-            false,
-            _context.Version);
+    _context.Document,
+    MarkdownDiff.Empty,
+    MarkdownStreamResult.Streaming,
+    _context.Version);
     }
 
     public MarkdownUpdate Append(string chunk)
@@ -70,7 +70,7 @@ public sealed class MarkdownStreamProcessor
             return new MarkdownUpdate(
                 _context.Document,
                 MarkdownDiff.Empty,
-                false,
+                MarkdownStreamResult.Streaming,
                 _context.Version);
         }
 
@@ -96,10 +96,10 @@ public sealed class MarkdownStreamProcessor
         _context.Version++;
 
         return new MarkdownUpdate(
-            reconciledDocument,
-            diff,
-            false,
-            _context.Version);
+    reconciledDocument,
+    diff,
+    MarkdownStreamResult.Streaming,
+    _context.Version);
     }
 
     public MarkdownUpdate Complete()
@@ -129,10 +129,10 @@ public sealed class MarkdownStreamProcessor
         _context.Version++;
 
         return new MarkdownUpdate(
-            reconciledDocument,
-            diff,
-            true,
-            _context.Version);
+    reconciledDocument,
+    diff,
+    MarkdownStreamResult.Completed,
+    _context.Version);
     }
 
     public void Reset()
@@ -147,6 +147,22 @@ public sealed class MarkdownStreamProcessor
         _context.Document =
             MarkdownDocument.Empty;
     }
+
+public MarkdownUpdate Cancel()
+{
+    EnsureStreaming();
+
+    _context.State =
+        MarkdownStreamState.Cancelled;
+
+    _context.Version++;
+
+    return new MarkdownUpdate(
+        _context.Document,
+        MarkdownDiff.Empty,
+        MarkdownStreamResult.Cancelled,
+        _context.Version);
+}
 
     private void EnsureStreaming()
     {

@@ -9,14 +9,17 @@ public sealed class MarkdownUpdate
 
     public MarkdownDiff Diff { get; }
 
-    public bool IsCompleted { get; }
+    public MarkdownStreamResult Result { get; }
 
     public long Version { get; }
+
+    public bool IsCompleted =>
+        Result == MarkdownStreamResult.Completed;
 
     public MarkdownUpdate(
         MarkdownDocument document,
         MarkdownDiff diff,
-        bool isCompleted,
+        MarkdownStreamResult result,
         long version)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -24,7 +27,7 @@ public sealed class MarkdownUpdate
 
         Document = document;
         Diff = diff;
-        IsCompleted = isCompleted;
+        Result = result;
         Version = version;
     }
 }

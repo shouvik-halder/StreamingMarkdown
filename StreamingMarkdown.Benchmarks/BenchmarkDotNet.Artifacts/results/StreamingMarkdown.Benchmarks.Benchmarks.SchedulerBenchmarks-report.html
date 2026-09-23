@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>StreamingMarkdown.Benchmarks.Benchmarks.SchedulerBenchmarks-20260923-195730</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.15.8, macOS 27.0 (26A428) [Darwin 27.0.0]
+Apple M3 Pro, 1 CPU, 11 logical and 11 physical cores
+.NET SDK 10.0.300
+  [Host]     : .NET 10.0.8 (10.0.8, 10.0.826.23019), Arm64 RyuJIT armv8.0-a
+  DefaultJob : .NET 10.0.8 (10.0.8, 10.0.826.23019), Arm64 RyuJIT armv8.0-a
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method   </th><th>ChunkCount</th><th>Mean  </th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>DirectProcessor</td><td>100</td><td>78.75 &mu;s</td><td>1.565 &mu;s</td><td>1.607 &mu;s</td><td>1.00</td><td>0.03</td><td>38.5742</td><td>2.3193</td><td>-</td><td>315.61 KB</td><td>1.00</td>
+</tr><tr><td>Scheduler</td><td>100</td><td>10.92 &mu;s</td><td>0.098 &mu;s</td><td>0.082 &mu;s</td><td>0.14</td><td>0.00</td><td>4.3640</td><td>0.2441</td><td>-</td><td>35.76 KB</td><td>0.11</td>
+</tr><tr><td>DirectProcessor</td><td>500</td><td>662.94 &mu;s</td><td>12.753 &mu;s</td><td>13.646 &mu;s</td><td>1.00</td><td>0.03</td><td>605.4688</td><td>90.8203</td><td>-</td><td>4947.79 KB</td><td>1.00</td>
+</tr><tr><td>Scheduler</td><td>500</td><td>19.73 &mu;s</td><td>0.378 &mu;s</td><td>0.295 &mu;s</td><td>0.03</td><td>0.00</td><td>11.9629</td><td>1.4648</td><td>-</td><td>98.21 KB</td><td>0.02</td>
+</tr><tr><td>DirectProcessor</td><td>1000</td><td>2,002.24 &mu;s</td><td>11.236 &mu;s</td><td>8.772 &mu;s</td><td>1.00</td><td>0.01</td><td>2277.3438</td><td>359.3750</td><td>19.5313</td><td>18646.11 KB</td><td>1.000</td>
+</tr><tr><td>Scheduler</td><td>1000</td><td>28.36 &mu;s</td><td>0.394 &mu;s</td><td>0.329 &mu;s</td><td>0.01</td><td>0.00</td><td>21.3623</td><td>4.3945</td><td>-</td><td>174.67 KB</td><td>0.009</td>
+</tr><tr><td>DirectProcessor</td><td>5000</td><td>40,472.10 &mu;s</td><td>807.661 &mu;s</td><td>1,050.187 &mu;s</td><td>1.001</td><td>0.04</td><td>79615.3846</td><td>42000.0000</td><td>36769.2308</td><td>475889.33 KB</td><td>1.000</td>
+</tr><tr><td>Scheduler</td><td>5000</td><td>157.88 &mu;s</td><td>2.958 &mu;s</td><td>2.906 &mu;s</td><td>0.004</td><td>0.00</td><td>181.6406</td><td>181.6406</td><td>181.6406</td><td>834.13 KB</td><td>0.002</td>
+</tr></tbody></table>
+</body>
+</html>

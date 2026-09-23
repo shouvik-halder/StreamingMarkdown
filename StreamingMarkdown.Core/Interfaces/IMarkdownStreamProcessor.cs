@@ -6,9 +6,12 @@ public interface IMarkdownStreamProcessor
 {
     MarkdownUpdate Begin();
 
-    MarkdownUpdate Append(string chunk);
+    MarkdownUpdate Append(
+        string chunk);
 
     MarkdownUpdate Complete();
+
+    MarkdownUpdate Cancel();
 
     void Reset();
 }

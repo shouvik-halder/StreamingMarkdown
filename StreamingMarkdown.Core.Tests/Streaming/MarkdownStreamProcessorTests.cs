@@ -417,4 +417,95 @@ public void Cancel_PreventsComplete()
         processor.Complete();
     });
 }
+
+[Fact]
+public void Fail_ReturnsFailedResult()
+{
+    var processor = CreateProcessor();
+
+    processor.Begin();
+
+    var exception =
+        new InvalidOperationException("Parser failed.");
+
+    var update =
+        processor.Fail(exception);
+
+    Assert.Equal(
+        MarkdownStreamResult.Failed,
+        update.Result);
+
+    Assert.True(update.HasError);
+
+    Assert.Equal(
+        "Parser failed.",
+        update.ErrorMessage);
+
+    Assert.Empty(update.Document.Blocks);
+
+    Assert.Empty(update.Diff.Changes);
+}
+
+[Fact]
+public void Append_AfterFailure_Throws()
+{
+    var processor = CreateProcessor();
+
+    processor.Begin();
+
+    processor.Fail(
+        new InvalidOperationException("Processing failed."));
+
+    Assert.Throws<InvalidOperationException>(
+        () => processor.Append("more markdown"));
+}
+
+[Fact]
+public void Complete_AfterFailure_Throws()
+{
+    var processor = CreateProcessor();
+
+    processor.Begin();
+
+    processor.Fail(
+        new InvalidOperationException("Processing failed."));
+
+    Assert.Throws<InvalidOperationException>(
+        () => processor.Complete());
+}
+
+[Fact]
+public void Fail_AfterFailure_Throws()
+{
+    var processor = CreateProcessor();
+
+    processor.Begin();
+
+    processor.Fail(
+        new InvalidOperationException("First failure."));
+
+    Assert.Throws<InvalidOperationException>(
+        () => processor.Fail(
+            new InvalidOperationException("Second failure.")));
+}
+
+[Fact]
+public void Reset_AfterFailure_AllowsNewStream()
+{
+    var processor = CreateProcessor();
+
+    processor.Begin();
+
+    processor.Fail(
+        new InvalidOperationException("Processing failed."));
+
+    processor.Reset();
+
+    var update = processor.Begin();
+
+    Assert.Equal(
+        MarkdownStreamResult.Streaming,
+        update.Result);
+}
+
 }

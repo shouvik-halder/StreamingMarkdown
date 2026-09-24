@@ -5,5 +5,6 @@ public enum MarkdownStreamState
     Idle,
     Streaming,
     Completed,
+    Failed,
     Cancelled
 }

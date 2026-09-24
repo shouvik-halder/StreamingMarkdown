@@ -170,47 +170,285 @@ public sealed class MarkdownStreamSchedulerTests
     }
 
     [Fact]
-public async Task CompleteAsync_WaitsForProcessingToFinish()
-{
-    var parser = new BlockingMarkdownParser();
+    public async Task CompleteAsync_WaitsForProcessingToFinish()
+    {
+        var parser = new BlockingMarkdownParser();
 
-    var processor = CreateProcessor(parser);
+        var processor = CreateProcessor(parser);
 
-    var scheduler =
-        new MarkdownStreamScheduler(processor);
+        var scheduler =
+            new MarkdownStreamScheduler(processor);
 
-    scheduler.Begin();
+        scheduler.Begin();
 
-    scheduler.Append("Hello");
+        scheduler.Append("Hello");
 
-    // Give the scheduler time to start processing.
-    await parser.ProcessingStarted.Task;
+        // Give the scheduler time to start processing.
+        await parser.ProcessingStarted.Task;
 
-    var completeTask =
-        scheduler.CompleteAsync();
+        var completeTask =
+            scheduler.CompleteAsync();
 
-    // CompleteAsync must still be waiting because
-    // the processor is intentionally blocked.
-    await Task.Delay(25);
+        // CompleteAsync must still be waiting because
+        // the processor is intentionally blocked.
+        await Task.Delay(25);
 
-    Assert.False(
-        completeTask.IsCompleted);
+        Assert.False(
+            completeTask.IsCompleted);
 
-    // Allow the processor to finish.
-    parser.ReleaseProcessing();
+        // Allow the processor to finish.
+        parser.ReleaseProcessing();
 
-    await completeTask;
+        await completeTask;
 
-    Assert.True(
-        parser.CompletedAfterProcessing);
+        Assert.True(
+            parser.CompletedAfterProcessing);
 
-    scheduler.Reset();
-}
+        scheduler.Reset();
+    }
+
+    [Fact]
+    public async Task Append_ChunksAreNotLostDuringProcessing()
+    {
+        var parser = new RecordingMarkdownParser();
+
+        var processor =
+            CreateProcessor(parser);
+
+        var scheduler =
+            new MarkdownStreamScheduler(processor);
+
+        scheduler.Begin();
+
+        scheduler.Append("Hello ");
+        scheduler.Append("world ");
+        scheduler.Append("from ");
+        scheduler.Append("StreamingMarkdown");
+
+        await scheduler.CompleteAsync();
+
+        Assert.Contains(
+            "Hello world from StreamingMarkdown",
+            parser.ParsedContents);
+
+        scheduler.Reset();
+    }
+
+    [Fact]
+    public async Task CompleteAsync_EmitsCompletedUpdateAfterFinalProcessing()
+    {
+        var parser =
+            new RecordingMarkdownParser();
+
+        var processor =
+            CreateProcessor(parser);
+
+        var scheduler =
+            new MarkdownStreamScheduler(processor);
+
+        var updates =
+            new List<MarkdownUpdate>();
+
+        scheduler.UpdateAvailable += update =>
+        {
+            updates.Add(update);
+        };
+
+        scheduler.Begin();
+
+        scheduler.Append("Hello");
+        scheduler.Append(" world");
+
+        await scheduler.CompleteAsync();
+
+        Assert.NotEmpty(updates);
+
+        Assert.True(
+            updates[^1].IsCompleted);
+
+        Assert.All(
+            updates.Take(updates.Count - 1),
+            update => Assert.False(update.IsCompleted));
+
+        scheduler.Reset();
+    }
+
+    [Fact]
+    public async Task ConcurrentAppends_DoNotLoseChunks()
+    {
+        var parser = new RecordingMarkdownParser();
+
+        var processor =
+            CreateProcessor(parser);
+
+        var scheduler =
+            new MarkdownStreamScheduler(processor);
+
+        scheduler.Begin();
+
+        var tasks = Enumerable
+            .Range(0, 100)
+            .Select(i =>
+                Task.Run(() =>
+                {
+                    scheduler.Append($"chunk-{i} ");
+                }))
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+
+        await scheduler.CompleteAsync();
+
+        var parsedContent =
+            string.Join(
+                " ",
+                parser.ParsedContents);
+
+        for (var i = 0; i < 100; i++)
+        {
+            Assert.Contains(
+                $"chunk-{i}",
+                parsedContent);
+        }
+
+        scheduler.Reset();
+    }
+
+    [Fact]
+    public async Task CancelAsync_EmitsCancelledUpdate()
+    {
+        var processor =
+            CreateProcessor();
+
+        var scheduler =
+            new MarkdownStreamScheduler(processor);
+
+        MarkdownUpdate? cancelledUpdate = null;
+
+        scheduler.UpdateAvailable += update =>
+        {
+            if (update.Result ==
+                MarkdownStreamResult.Cancelled)
+            {
+                cancelledUpdate = update;
+            }
+        };
+
+        scheduler.Begin();
+
+        scheduler.Append("Hello");
+
+        await scheduler.CancelAsync();
+
+        Assert.NotNull(cancelledUpdate);
+
+        Assert.Equal(
+            MarkdownStreamResult.Cancelled,
+            cancelledUpdate!.Result);
+
+        Assert.False(
+            cancelledUpdate.IsCompleted);
+    }
+
+
+    [Fact]
+    public async Task CancelAsync_DiscardsPendingChunks()
+    {
+        var parser =
+            new RecordingMarkdownParser();
+
+        var processor =
+            CreateProcessor(parser);
+
+        var scheduler =
+            new MarkdownStreamScheduler(processor);
+
+        scheduler.Begin();
+
+        scheduler.Append("Hello ");
+        scheduler.Append("world ");
+        scheduler.Append("this ");
+        scheduler.Append("should ");
+        scheduler.Append("not process");
+
+        await scheduler.CancelAsync();
+
+        Assert.DoesNotContain(
+            "should not process",
+            parser.ParsedContents);
+    }
+
+    [Fact]
+    public async Task Append_AfterCancellation_Throws()
+    {
+        var processor =
+            CreateProcessor();
+
+        var scheduler =
+            new MarkdownStreamScheduler(processor);
+
+        scheduler.Begin();
+
+        await scheduler.CancelAsync();
+
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            scheduler.Append("This should fail");
+        });
+    }
+
+    [Fact]
+    public async Task Complete_AfterCancellation_Throws()
+    {
+        var processor =
+            CreateProcessor();
+
+        var scheduler =
+            new MarkdownStreamScheduler(processor);
+
+        scheduler.Begin();
+
+        await scheduler.CancelAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () =>
+            {
+                await scheduler.CompleteAsync();
+            });
+    }
+
+    [Fact]
+    public async Task CancelAsync_AllowsNewStream()
+    {
+        var processor =
+            CreateProcessor();
+
+        var scheduler =
+            new MarkdownStreamScheduler(processor);
+
+        scheduler.Begin();
+
+        await scheduler.CancelAsync();
+
+        var exception =
+            Record.Exception(() =>
+            {
+                scheduler.Begin();
+            });
+
+        Assert.Null(exception);
+
+        scheduler.Reset();
+    }
 
 [Fact]
-public async Task Append_ChunksAreNotLostDuringProcessing()
+public async Task ProcessingFailure_EmitsFailedUpdate()
 {
-    var parser = new RecordingMarkdownParser();
+    var exception =
+        new InvalidOperationException("Parser failed.");
+
+    var parser =
+        new ThrowingMarkdownParser(exception);
 
     var processor =
         CreateProcessor(parser);
@@ -218,27 +456,59 @@ public async Task Append_ChunksAreNotLostDuringProcessing()
     var scheduler =
         new MarkdownStreamScheduler(processor);
 
+    var failedUpdate =
+        new TaskCompletionSource<MarkdownUpdate>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+    scheduler.UpdateAvailable += update =>
+    {
+        if (update.Result ==
+            MarkdownStreamResult.Failed)
+        {
+            failedUpdate.TrySetResult(update);
+        }
+    };
+
     scheduler.Begin();
 
-    scheduler.Append("Hello ");
-    scheduler.Append("world ");
-    scheduler.Append("from ");
-    scheduler.Append("StreamingMarkdown");
+    scheduler.Append("Hello");
 
-    await scheduler.CompleteAsync();
+    var completedTask =
+        await Task.WhenAny(
+            failedUpdate.Task,
+            Task.Delay(TimeSpan.FromSeconds(2)));
 
-    Assert.Contains(
-        "Hello world from StreamingMarkdown",
-        parser.ParsedContents);
+    Assert.Same(
+        failedUpdate.Task,
+        completedTask);
+
+    var update =
+        await failedUpdate.Task;
+
+    Assert.Equal(
+        MarkdownStreamResult.Failed,
+        update.Result);
+
+    Assert.True(
+        update.HasError);
+
+    Assert.Equal(
+        "Parser failed.",
+        update.ErrorMessage);
+
+    Assert.Empty(
+        update.Document.Blocks);
 
     scheduler.Reset();
 }
-
-[Fact]
-public async Task CompleteAsync_EmitsCompletedUpdateAfterFinalProcessing()
+    [Fact]
+public async Task ProcessingFailure_EmitsFailedUpdateDuringProcessing()
 {
+    var exception =
+        new InvalidOperationException("Processing failed.");
+
     var parser =
-        new RecordingMarkdownParser();
+        new ThrowingMarkdownParser(exception);
 
     var processor =
         CreateProcessor(parser);
@@ -257,26 +527,34 @@ public async Task CompleteAsync_EmitsCompletedUpdateAfterFinalProcessing()
     scheduler.Begin();
 
     scheduler.Append("Hello");
-    scheduler.Append(" world");
 
-    await scheduler.CompleteAsync();
+    await Task.Delay(100);
 
-    Assert.NotEmpty(updates);
+    Assert.Contains(
+        updates,
+        update =>
+            update.Result ==
+            MarkdownStreamResult.Failed);
 
-    Assert.True(
-        updates[^1].IsCompleted);
+    var failedUpdate =
+        updates.Single(
+            update =>
+                update.Result ==
+                MarkdownStreamResult.Failed);
 
-    Assert.All(
-        updates.Take(updates.Count - 1),
-        update => Assert.False(update.IsCompleted));
-
-    scheduler.Reset();
+    Assert.Equal(
+        "Processing failed.",
+        failedUpdate.ErrorMessage);
 }
 
 [Fact]
-public async Task ConcurrentAppends_DoNotLoseChunks()
+public async Task ProcessingFailure_StopsFurtherProcessing()
 {
-    var parser = new RecordingMarkdownParser();
+    var exception =
+        new InvalidOperationException("Processing failed.");
+
+    var parser =
+        new ThrowingMarkdownParser(exception);
 
     var processor =
         CreateProcessor(parser);
@@ -284,159 +562,77 @@ public async Task ConcurrentAppends_DoNotLoseChunks()
     var scheduler =
         new MarkdownStreamScheduler(processor);
 
+    var updates =
+        new List<MarkdownUpdate>();
+
+    scheduler.UpdateAvailable += update =>
+    {
+        updates.Add(update);
+    };
+
     scheduler.Begin();
 
-    var tasks = Enumerable
-        .Range(0, 100)
-        .Select(i =>
-            Task.Run(() =>
-            {
-                scheduler.Append($"chunk-{i} ");
-            }))
-        .ToArray();
+    scheduler.Append("First");
 
-    await Task.WhenAll(tasks);
+    await Task.Delay(100);
 
-    await scheduler.CompleteAsync();
+    Assert.Contains(
+        updates,
+        update =>
+            update.Result ==
+            MarkdownStreamResult.Failed);
 
-    var parsedContent =
-        string.Join(
-            " ",
-            parser.ParsedContents);
-
-    for (var i = 0; i < 100; i++)
-    {
-        Assert.Contains(
-            $"chunk-{i}",
-            parsedContent);
-    }
-
-    scheduler.Reset();
+    Assert.Throws<InvalidOperationException>(
+        () => scheduler.Append("Second"));
 }
 
 [Fact]
-public async Task CancelAsync_EmitsCancelledUpdate()
+public async Task Reset_AfterProcessingFailure_AllowsNewStream()
 {
+    var exception =
+        new InvalidOperationException("Parser failed.");
+
+    var parser =
+        new ThrowingMarkdownParser(exception);
+
     var processor =
-        CreateProcessor();
+        CreateProcessor(parser);
 
     var scheduler =
         new MarkdownStreamScheduler(processor);
 
-    MarkdownUpdate? cancelledUpdate = null;
+    var failedUpdate =
+        new TaskCompletionSource<MarkdownUpdate>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
 
     scheduler.UpdateAvailable += update =>
     {
         if (update.Result ==
-            MarkdownStreamResult.Cancelled)
+            MarkdownStreamResult.Failed)
         {
-            cancelledUpdate = update;
+            failedUpdate.TrySetResult(update);
         }
     };
 
     scheduler.Begin();
 
-    scheduler.Append("Hello");
+    scheduler.Append("This will fail.");
 
-    await scheduler.CancelAsync();
+    await Task.WhenAny(
+        failedUpdate.Task,
+        Task.Delay(TimeSpan.FromSeconds(2)));
 
-    Assert.NotNull(cancelledUpdate);
+    Assert.True(
+        failedUpdate.Task.IsCompleted);
+
+    scheduler.Reset();
+
+    var newStream =
+        scheduler.Begin();
 
     Assert.Equal(
-        MarkdownStreamResult.Cancelled,
-        cancelledUpdate!.Result);
-
-    Assert.False(
-        cancelledUpdate.IsCompleted);
-}
-
-
-[Fact]
-public async Task CancelAsync_DiscardsPendingChunks()
-{
-    var parser =
-        new RecordingMarkdownParser();
-
-    var processor =
-        CreateProcessor(parser);
-
-    var scheduler =
-        new MarkdownStreamScheduler(processor);
-
-    scheduler.Begin();
-
-    scheduler.Append("Hello ");
-    scheduler.Append("world ");
-    scheduler.Append("this ");
-    scheduler.Append("should ");
-    scheduler.Append("not process");
-
-    await scheduler.CancelAsync();
-
-    Assert.DoesNotContain(
-        "should not process",
-        parser.ParsedContents);
-}
-
-[Fact]
-public async Task Append_AfterCancellation_Throws()
-{
-    var processor =
-        CreateProcessor();
-
-    var scheduler =
-        new MarkdownStreamScheduler(processor);
-
-    scheduler.Begin();
-
-    await scheduler.CancelAsync();
-
-    Assert.Throws<InvalidOperationException>(() =>
-    {
-        scheduler.Append("This should fail");
-    });
-}
-
-[Fact]
-public async Task Complete_AfterCancellation_Throws()
-{
-    var processor =
-        CreateProcessor();
-
-    var scheduler =
-        new MarkdownStreamScheduler(processor);
-
-    scheduler.Begin();
-
-    await scheduler.CancelAsync();
-
-    await Assert.ThrowsAsync<InvalidOperationException>(
-        async () =>
-        {
-            await scheduler.CompleteAsync();
-        });
-}
-
-[Fact]
-public async Task CancelAsync_AllowsNewStream()
-{
-    var processor =
-        CreateProcessor();
-
-    var scheduler =
-        new MarkdownStreamScheduler(processor);
-
-    scheduler.Begin();
-
-    await scheduler.CancelAsync();
-
-    var exception =
-        Record.Exception(() =>
-        {
-            scheduler.Begin();
-        });
-
-    Assert.Null(exception);
+        MarkdownStreamResult.Streaming,
+        newStream.Result);
 
     scheduler.Reset();
 }
@@ -468,34 +664,48 @@ public async Task CancelAsync_AllowsNewStream()
     }
 
     private sealed class BlockingMarkdownParser : IMarkdownParser
-{
-    public TaskCompletionSource<bool> ProcessingStarted { get; } =
-        new(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-    private readonly TaskCompletionSource<bool> _releaseProcessing =
-        new(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-    public bool CompletedAfterProcessing { get; private set; }
-
-    public MarkdownDocument Parse(string markdown)
     {
-        ProcessingStarted.TrySetResult(true);
+        public TaskCompletionSource<bool> ProcessingStarted { get; } =
+            new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
 
-        _releaseProcessing.Task
-            .GetAwaiter()
-            .GetResult();
+        private readonly TaskCompletionSource<bool> _releaseProcessing =
+            new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
 
-        CompletedAfterProcessing = true;
+        public bool CompletedAfterProcessing { get; private set; }
 
-        return MarkdownDocument.Empty;
+        public MarkdownDocument Parse(string markdown)
+        {
+            ProcessingStarted.TrySetResult(true);
+
+            _releaseProcessing.Task
+                .GetAwaiter()
+                .GetResult();
+
+            CompletedAfterProcessing = true;
+
+            return MarkdownDocument.Empty;
+        }
+
+        public void ReleaseProcessing()
+        {
+            _releaseProcessing.TrySetResult(true);
+        }
     }
 
-    public void ReleaseProcessing()
+    private sealed class ThrowingMarkdownParser : IMarkdownParser
     {
-        _releaseProcessing.TrySetResult(true);
-    }
-}
+        private readonly Exception _exception;
 
+        public ThrowingMarkdownParser(Exception exception)
+        {
+            _exception = exception;
+        }
+
+        public MarkdownDocument Parse(string markdown)
+        {
+            throw _exception;
+        }
+    }
 }

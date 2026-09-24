@@ -21,6 +21,8 @@ public sealed class MarkdownStreamScheduler
 
     private bool _isCompleting;
 
+    private bool _hasFailed;
+
     public event Action<MarkdownUpdate>? UpdateAvailable;
 
     public long ProcessedBatchCount { get; private set; }
@@ -47,11 +49,12 @@ public sealed class MarkdownStreamScheduler
 
             _isCompleting = false;
             _isProcessing = false;
+            _hasFailed = false;
 
             _processingCompletion = null;
 
             ProcessedBatchCount = 0;
-            
+
             var update =
                 _processor.Begin();
 
@@ -83,7 +86,8 @@ public sealed class MarkdownStreamScheduler
         lock (_sync)
         {
             if (_workerTask is null ||
-                _isCompleting)
+                _isCompleting ||
+                _hasFailed)
             {
                 throw new InvalidOperationException(
                     "The Markdown stream is not active.");
@@ -101,7 +105,8 @@ public sealed class MarkdownStreamScheduler
         lock (_sync)
         {
             if (_workerTask is null ||
-                _isCompleting)
+                _isCompleting ||
+                _hasFailed)
             {
                 throw new InvalidOperationException(
                     "The Markdown stream is not active.");
@@ -150,17 +155,35 @@ public sealed class MarkdownStreamScheduler
                 cancellationToken);
         }
 
-        MarkdownUpdate update;
+        MarkdownUpdate? update;
+        bool failed;
 
         lock (_sync)
         {
-            update =
-                _processor.Complete();
+            failed = _hasFailed;
+
+            if (failed)
+            {
+                update = null;
+            }
+            else
+            {
+                update =
+                    _processor.Complete();
+            }
 
             _workerCancellation?.Cancel();
         }
 
-        UpdateAvailable?.Invoke(update);
+        if (failed)
+        {
+            await StopWorkerAsync();
+
+            throw new InvalidOperationException(
+                "The Markdown stream has failed.");
+        }
+
+        UpdateAvailable?.Invoke(update!);
 
         await StopWorkerAsync();
     }
@@ -180,6 +203,7 @@ public sealed class MarkdownStreamScheduler
 
             _isCompleting = false;
             _isProcessing = false;
+            _hasFailed = false;
 
             _processingCompletion = null;
 
@@ -210,7 +234,8 @@ public sealed class MarkdownStreamScheduler
         }
         catch (OperationCanceledException)
         {
-            // Expected when the stream completes or resets.
+            // Expected when the stream completes,
+            // fails, is cancelled, or resets.
         }
     }
 
@@ -257,9 +282,30 @@ public sealed class MarkdownStreamScheduler
 
             ProcessedBatchCount++;
 
-            var update =
-                _processor.Append(
-                    combinedChunk);
+            MarkdownUpdate update;
+
+            try
+            {
+                update =
+                    _processor.Append(
+                        combinedChunk);
+            }
+            catch (Exception exception)
+            {
+                update =
+                    _processor.Fail(exception);
+
+                lock (_sync)
+                {
+                    _hasFailed = true;
+
+                    _isCompleting = true;
+
+                    _pendingChunks.Clear();
+
+                    _workerCancellation?.Cancel();
+                }
+            }
 
             UpdateAvailable?.Invoke(update);
         }
@@ -308,64 +354,64 @@ public sealed class MarkdownStreamScheduler
             }
             catch (OperationCanceledException)
             {
-                // Expected during completion/reset.
+                // Expected during completion/reset/failure.
             }
         }
 
         cancellation?.Dispose();
     }
 
-
     public async Task CancelAsync(
-    CancellationToken cancellationToken = default)
-{
-    CancellationTokenSource? cancellation;
-
-    lock (_sync)
+        CancellationToken cancellationToken = default)
     {
-        if (_workerTask is null ||
-            _isCompleting)
+        CancellationTokenSource? cancellation;
+
+        lock (_sync)
         {
-            throw new InvalidOperationException(
-                "The Markdown stream is not active.");
+            if (_workerTask is null ||
+                _isCompleting ||
+                _hasFailed)
+            {
+                throw new InvalidOperationException(
+                    "The Markdown stream is not active.");
+            }
+
+            _isCompleting = true;
+
+            // Anything waiting in the queue should not be
+            // processed after cancellation.
+            _pendingChunks.Clear();
+
+            cancellation =
+                _workerCancellation;
         }
 
-        _isCompleting = true;
+        cancellation?.Cancel();
 
-        // Anything waiting in the queue should not be
-        // processed after cancellation.
-        _pendingChunks.Clear();
+        Task? processingTask;
 
-        cancellation =
-            _workerCancellation;
+        lock (_sync)
+        {
+            processingTask =
+                _processingCompletion?.Task;
+        }
+
+        if (processingTask is not null)
+        {
+            await processingTask.WaitAsync(
+                cancellationToken);
+        }
+
+        MarkdownUpdate update;
+
+        lock (_sync)
+        {
+            update =
+                _processor.Cancel();
+        }
+
+        UpdateAvailable?.Invoke(update);
+
+        await StopWorkerAsync();
     }
-
-    cancellation?.Cancel();
-
-    Task? processingTask;
-
-    lock (_sync)
-    {
-        processingTask =
-            _processingCompletion?.Task;
-    }
-
-    if (processingTask is not null)
-    {
-        await processingTask.WaitAsync(
-            cancellationToken);
-    }
-
-    MarkdownUpdate update;
-
-    lock (_sync)
-    {
-        update =
-            _processor.Cancel();
-    }
-
-    UpdateAvailable?.Invoke(update);
-
-    await StopWorkerAsync();
-}
 }

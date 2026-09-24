@@ -164,6 +164,25 @@ public MarkdownUpdate Cancel()
         _context.Version);
 }
 
+public MarkdownUpdate Fail(Exception exception)
+{
+    ArgumentNullException.ThrowIfNull(exception);
+
+    EnsureStreaming();
+
+    _context.State =
+        MarkdownStreamState.Failed;
+
+    _context.Version++;
+
+    return new MarkdownUpdate(
+        MarkdownDocument.Empty,
+        MarkdownDiff.Empty,
+        MarkdownStreamResult.Failed,
+        _context.Version,
+        exception.Message);
+}
+
     private void EnsureStreaming()
     {
         if (_context.State !=

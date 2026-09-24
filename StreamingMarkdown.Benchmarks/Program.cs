@@ -1,8 +1,8 @@
-﻿// using BenchmarkDotNet.Running;
-// using StreamingMarkdown.Benchmarks.Benchmarks;
+﻿using BenchmarkDotNet.Running;
+using StreamingMarkdown.Benchmarks.Benchmarks;
 
-// BenchmarkRunner.Run<RealisticStreamingBenchmarks>();
+BenchmarkRunner.Run<BackgroundProcessingThroughputBenchmarks>();
 
-using StreamingMarkdown.Benchmarks;
+// using StreamingMarkdown.Benchmarks;
 
-await CoalescingDiagnostics.RunAsync();
+// await CoalescingDiagnostics.RunAsync();

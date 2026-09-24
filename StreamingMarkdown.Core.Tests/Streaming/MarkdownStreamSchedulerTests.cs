@@ -637,7 +637,85 @@ public async Task Reset_AfterProcessingFailure_AllowsNewStream()
     scheduler.Reset();
 }
 
+[Fact]
+public async Task Processing_RunsOnBackgroundThread()
+{
+    var parser =
+        new ThreadRecordingMarkdownParser();
 
+    var processor =
+        CreateProcessor(parser);
+
+    var scheduler =
+        new MarkdownStreamScheduler(processor);
+
+    var callerThreadId =
+        Environment.CurrentManagedThreadId;
+
+    var processingCompleted =
+        new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+    scheduler.UpdateAvailable += update =>
+    {
+        if (update.Result ==
+            MarkdownStreamResult.Streaming)
+        {
+            processingCompleted.TrySetResult(true);
+        }
+    };
+
+    scheduler.Begin();
+
+    scheduler.Append("Hello");
+
+    var completedTask =
+        await Task.WhenAny(
+            processingCompleted.Task,
+            Task.Delay(TimeSpan.FromSeconds(2)));
+
+    Assert.Same(
+        processingCompleted.Task,
+        completedTask);
+
+    Assert.NotEqual(
+        callerThreadId,
+        parser.ParseThreadId);
+
+    scheduler.Reset();
+}
+
+
+[Fact]
+public async Task Append_DoesNotBlockWhileProcessing()
+{
+    var parser =
+        new BlockingMarkdownParser();
+
+    var processor =
+        CreateProcessor(parser);
+
+    var scheduler =
+        new MarkdownStreamScheduler(processor);
+
+    scheduler.Begin();
+
+    var stopwatch =
+        System.Diagnostics.Stopwatch.StartNew();
+
+    scheduler.Append("Hello");
+
+    stopwatch.Stop();
+
+    Assert.True(
+        stopwatch.ElapsedMilliseconds < 50);
+
+    await parser.ProcessingStarted.Task;
+
+    parser.ReleaseProcessing();
+
+    scheduler.Reset();
+}
 
     private static MarkdownStreamProcessor CreateProcessor(
         IMarkdownParser? parser = null)
@@ -650,6 +728,19 @@ public async Task Reset_AfterProcessingFailure_AllowsNewStream()
             new DocumentReconciler(),
             new DocumentDiffEngine());
     }
+
+    private sealed class ThreadRecordingMarkdownParser : IMarkdownParser
+{
+    public int ParseThreadId { get; private set; }
+
+    public MarkdownDocument Parse(string markdown)
+    {
+        ParseThreadId =
+            Environment.CurrentManagedThreadId;
+
+        return MarkdownDocument.Empty;
+    }
+}
 
     private sealed class RecordingMarkdownParser : IMarkdownParser
     {

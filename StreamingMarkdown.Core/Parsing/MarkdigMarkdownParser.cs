@@ -102,9 +102,11 @@ public sealed class MarkdigMarkdownParser : IMarkdownParser
             heading.Inline);
 
         return new HeadingBlock(
-            position,
-            heading.Level,
-            inlines);
+    position,
+    heading.Span.Start,
+    heading.Span.End,
+    heading.Level,
+    inlines);
     }
 
     private static ParagraphBlock ParseParagraph(
@@ -128,19 +130,22 @@ public sealed class MarkdigMarkdownParser : IMarkdownParser
         if (ContainsIncompleteLink(sourceText))
         {
             return new ParagraphBlock(
-                position,
-                new MarkdownInline[]
-                {
-                    new TextInline(sourceText)
-                });
+    position,
+    paragraph.Span.Start,
+    paragraph.Span.End,
+    [
+        new TextInline(sourceText)
+    ]);
         }
 
         var inlines = ParseInlines(
             paragraph.Inline);
 
         return new ParagraphBlock(
-            position,
-            inlines);
+    position,
+    paragraph.Span.Start,
+    paragraph.Span.End,
+    inlines);
     }
 
     private static QuoteBlock ParseQuote(
@@ -167,8 +172,10 @@ public sealed class MarkdigMarkdownParser : IMarkdownParser
         }
 
         return new QuoteBlock(
-            position,
-            blocks);
+    position,
+    quote.Span.Start,
+    quote.Span.End,
+    blocks);
     }
 
     private static ListBlock ParseList(
@@ -208,9 +215,11 @@ public sealed class MarkdigMarkdownParser : IMarkdownParser
         }
 
         return new ListBlock(
-            position,
-            list.IsOrdered,
-            items);
+    position,
+    list.Span.Start,
+    list.Span.End,
+    list.IsOrdered,
+    items);
     }
 
     private static IReadOnlyList<MarkdownInline> ParseInlines(

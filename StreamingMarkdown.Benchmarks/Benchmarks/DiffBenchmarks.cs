@@ -41,11 +41,12 @@ public class DiffBenchmarks
         {
             blocks.Add(
                 new ParagraphBlock(
-                    i,
-                    new MarkdownInline[]
-                    {
-                        new TextInline($"Paragraph {i}")
-                    }));
+    i,
+    i,
+    i + 1,
+    [
+        new TextInline($"Paragraph {i}")
+    ]));
         }
 
         return new MarkdownDocument(blocks);
@@ -59,11 +60,12 @@ public class DiffBenchmarks
         {
             blocks.Add(
                 new ParagraphBlock(
-                    i,
-                    new MarkdownInline[]
-                    {
-                        new TextInline($"Updated paragraph {i}")
-                    }));
+    i,
+    i,
+    i + 1,
+    [
+        new TextInline($"Updated paragraph {i}")
+    ]));
         }
 
         return new MarkdownDocument(blocks);

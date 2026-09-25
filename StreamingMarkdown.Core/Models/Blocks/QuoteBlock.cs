@@ -5,10 +5,16 @@ public sealed class QuoteBlock : MarkdownBlock
     public IReadOnlyList<MarkdownBlock> Blocks { get; }
 
     public QuoteBlock(
-    int position,
-    IReadOnlyList<MarkdownBlock> blocks,
-    Guid? id = null)
-    : base(position, id)
+        int position,
+        int sourceStart,
+        int sourceEnd,
+        IReadOnlyList<MarkdownBlock> blocks,
+        Guid? id = null)
+        : base(
+            position,
+            sourceStart,
+            sourceEnd,
+            id)
     {
         ArgumentNullException.ThrowIfNull(blocks);
 

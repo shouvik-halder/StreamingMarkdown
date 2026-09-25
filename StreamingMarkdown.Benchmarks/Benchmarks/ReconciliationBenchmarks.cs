@@ -19,13 +19,17 @@ public class ReconciliationBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        _reconciler = new DocumentReconciler();
+        _reconciler =
+            new DocumentReconciler();
 
-        _previous = CreateDocument(BlockCount);
-        _current = CreateModifiedDocument(BlockCount);
+        _previous =
+            CreateDocument(BlockCount);
+
+        _current =
+            CreateModifiedDocument(BlockCount);
     }
 
-    [Benchmark]
+    [Benchmark(Baseline = true)]
     public MarkdownDocument Reconcile()
     {
         return _reconciler.Reconcile(
@@ -33,39 +37,71 @@ public class ReconciliationBenchmarks
             _current);
     }
 
-    private static MarkdownDocument CreateDocument(int blockCount)
+    [Benchmark]
+    public MarkdownDocument ReconcileIncremental()
     {
-        var blocks = new List<MarkdownBlock>(blockCount);
+        // Treat every block except the final block
+        // as the stable prefix.
+        var reusedBlockCount =
+            Math.Max(
+                0,
+                BlockCount - 1);
 
-        for (var i = 0; i < blockCount; i++)
-        {
-            blocks.Add(
-                new ParagraphBlock(
-                    i,
-                    new MarkdownInline[]
-                    {
-                        new TextInline($"Paragraph {i}")
-                    }));
-        }
-
-        return new MarkdownDocument(blocks);
+        return _reconciler.ReconcileIncremental(
+            _previous,
+            _current,
+            reusedBlockCount);
     }
 
-    private static MarkdownDocument CreateModifiedDocument(int blockCount)
+    private static MarkdownDocument CreateDocument(
+        int blockCount)
     {
-        var blocks = new List<MarkdownBlock>(blockCount);
+        var blocks =
+            new List<MarkdownBlock>(
+                blockCount);
 
-        for (var i = 0; i < blockCount; i++)
+        for (var i = 0;
+             i < blockCount;
+             i++)
         {
             blocks.Add(
                 new ParagraphBlock(
                     i,
-                    new MarkdownInline[]
-                    {
-                        new TextInline($"Updated paragraph {i}")
-                    }));
+                    i,
+                    i + 1,
+                    [
+                        new TextInline(
+                            $"Paragraph {i}")
+                    ]));
         }
 
-        return new MarkdownDocument(blocks);
+        return new MarkdownDocument(
+            blocks);
+    }
+
+    private static MarkdownDocument CreateModifiedDocument(
+        int blockCount)
+    {
+        var blocks =
+            new List<MarkdownBlock>(
+                blockCount);
+
+        for (var i = 0;
+             i < blockCount;
+             i++)
+        {
+            blocks.Add(
+                new ParagraphBlock(
+                    i,
+                    i,
+                    i + 1,
+                    [
+                        new TextInline(
+                            $"Updated paragraph {i}")
+                    ]));
+        }
+
+        return new MarkdownDocument(
+            blocks);
     }
 }

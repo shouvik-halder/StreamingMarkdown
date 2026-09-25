@@ -10,10 +10,16 @@ public sealed class HeadingBlock : MarkdownBlock
 
     public HeadingBlock(
     int position,
+    int sourceStart,
+    int sourceEnd,
     int level,
     IReadOnlyList<MarkdownInline> inlines,
     Guid? id = null)
-    : base(position, id)
+    : base(
+        position,
+        sourceStart,
+        sourceEnd,
+        id)
     {
         if (level is < 1 or > 6)
             throw new ArgumentOutOfRangeException(nameof(level));

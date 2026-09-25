@@ -17,6 +17,24 @@ public sealed class MarkdownBuffer
         _buffer.Append(chunk);
     }
 
+    public string GetSuffix(int start)
+{
+    ArgumentOutOfRangeException.ThrowIfNegative(start);
+
+    if (start > _buffer.Length)
+    {
+        throw new ArgumentOutOfRangeException(
+            nameof(start));
+    }
+
+    if (start == _buffer.Length)
+        return string.Empty;
+
+    return _buffer.ToString(
+        start,
+        _buffer.Length - start);
+}
+
     public void Clear()
     {
         _buffer.Clear();

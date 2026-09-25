@@ -1,7 +1,7 @@
 ﻿using BenchmarkDotNet.Running;
 using StreamingMarkdown.Benchmarks.Benchmarks;
 
-BenchmarkRunner.Run<BackgroundProcessingThroughputBenchmarks>();
+BenchmarkRunner.Run<IncrementalParserBenchmarks>();
 
 // using StreamingMarkdown.Benchmarks;
 

@@ -426,4 +426,170 @@ public void StreamingMarkdown_ShouldGenerateExpectedChanges()
         MarkdownChangeType.Added,
         Assert.Single(update5.Diff.Changes).Type);
 }
+
+[Fact]
+public void CompareIncremental_WhenBlockIsAdded_ShouldReturnDocumentIndex()
+{
+    var previous =
+        _parser.Parse("""
+            # Pool
+
+            Water condition is good.
+            """);
+
+    var current =
+        _parser.Parse("""
+            # Pool
+
+            Water condition is good.
+
+            Final note.
+            """);
+
+    var diff =
+        _diffEngine.CompareIncremental(
+            previous,
+            current,
+            2);
+
+    var change =
+        Assert.Single(diff.Changes);
+
+    Assert.Equal(
+        MarkdownChangeType.Added,
+        change.Type);
+
+    Assert.Equal(
+        -1,
+        change.PreviousIndex);
+
+    Assert.Equal(
+        2,
+        change.CurrentIndex);
+}
+
+[Fact]
+public void CompareIncremental_WhenFinalBlockChanges_ShouldReportModified()
+{
+    var previous =
+        _parser.Parse("""
+            # Pool
+
+            Water condition is good.
+            """);
+
+    var current =
+        _parser.Parse("""
+            # Pool
+
+            Water condition is excellent.
+            """);
+
+    var diff =
+        _diffEngine.CompareIncremental(
+            previous,
+            current,
+            1);
+
+    var change =
+        Assert.Single(diff.Changes);
+
+    Assert.Equal(
+        MarkdownChangeType.Modified,
+        change.Type);
+
+    Assert.Equal(
+        1,
+        change.PreviousIndex);
+
+    Assert.Equal(
+        1,
+        change.CurrentIndex);
+}
+
+[Fact]
+public void CompareIncremental_WhenBlockIsRemoved_ShouldReturnDocumentIndex()
+{
+    var previous =
+        _parser.Parse("""
+            # Pool
+
+            Water condition is good.
+
+            Final note.
+            """);
+
+    var current =
+        _parser.Parse("""
+            # Pool
+
+            Water condition is good.
+            """);
+
+    var diff =
+        _diffEngine.CompareIncremental(
+            previous,
+            current,
+            2);
+
+    var change =
+        Assert.Single(diff.Changes);
+
+    Assert.Equal(
+        MarkdownChangeType.Removed,
+        change.Type);
+
+    Assert.Equal(
+        2,
+        change.PreviousIndex);
+
+    Assert.Equal(
+        -1,
+        change.CurrentIndex);
+}
+
+[Fact]
+public void CompareIncremental_WhenBlockIsInsertedInAffectedRegion_ShouldOnlyReportInsertion()
+{
+    var previous =
+        _parser.Parse("""
+            # Pool
+
+            Water condition is good.
+
+            Final note.
+            """);
+
+    var current =
+        _parser.Parse("""
+            # Pool
+
+            Water condition is good.
+
+            New information.
+
+            Final note.
+            """);
+
+    var diff =
+        _diffEngine.CompareIncremental(
+            previous,
+            current,
+            1);
+
+    var change =
+        Assert.Single(diff.Changes);
+
+    Assert.Equal(
+        MarkdownChangeType.Added,
+        change.Type);
+
+    Assert.Equal(
+        -1,
+        change.PreviousIndex);
+
+    Assert.Equal(
+        2,
+        change.CurrentIndex);
+}
 }

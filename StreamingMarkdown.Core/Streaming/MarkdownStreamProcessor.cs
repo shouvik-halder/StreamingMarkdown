@@ -11,6 +11,7 @@ public sealed class MarkdownStreamProcessor
 {
     private readonly MarkdownBuffer _buffer;
     private readonly IMarkdownParser _parser;
+    private readonly IIncrementalMarkdownParser _incrementalParser;
     private readonly IDocumentReconciler _reconciler;
     private readonly IDocumentDiffEngine _diffEngine;
     private readonly MarkdownStreamContext _context;
@@ -28,6 +29,10 @@ public sealed class MarkdownStreamProcessor
 
         _buffer = buffer;
         _parser = parser;
+
+        _incrementalParser =
+            new IncrementalMarkdownParser(parser);
+
         _reconciler = reconciler;
         _diffEngine = diffEngine;
 
@@ -53,55 +58,66 @@ public sealed class MarkdownStreamProcessor
             MarkdownDocument.Empty;
 
         return new MarkdownUpdate(
-    _context.Document,
-    MarkdownDiff.Empty,
-    MarkdownStreamResult.Streaming,
-    _context.Version);
+            _context.Document,
+            MarkdownDiff.Empty,
+            MarkdownStreamResult.Streaming,
+            _context.Version);
     }
 
-    public MarkdownUpdate Append(string chunk)
+public MarkdownUpdate Append(string chunk)
+{
+    ArgumentNullException.ThrowIfNull(chunk);
+
+    EnsureStreaming();
+
+    if (chunk.Length == 0)
     {
-        ArgumentNullException.ThrowIfNull(chunk);
-
-        EnsureStreaming();
-
-        if (chunk.Length == 0)
-        {
-            return new MarkdownUpdate(
-                _context.Document,
-                MarkdownDiff.Empty,
-                MarkdownStreamResult.Streaming,
-                _context.Version);
-        }
-
-        _buffer.Append(chunk);
-
-        var parsedDocument =
-            _parser.Parse(
-                _buffer.Content);
-
-        var reconciledDocument =
-            _reconciler.Reconcile(
-                _context.Document,
-                parsedDocument);
-
-        var diff =
-            _diffEngine.Compare(
-                _context.Document,
-                reconciledDocument);
-
-        _context.Document =
-            reconciledDocument;
-
-        _context.Version++;
-
         return new MarkdownUpdate(
-    reconciledDocument,
-    diff,
-    MarkdownStreamResult.Streaming,
-    _context.Version);
+            _context.Document,
+            MarkdownDiff.Empty,
+            MarkdownStreamResult.Streaming,
+            _context.Version);
     }
 
+    _buffer.Append(chunk);
+
+    var reparseStart =
+        _context.Document.Blocks.Count > 0
+            ? _context.Document.Blocks[^1].SourceStart
+            : 0;
+
+    var suffix =
+        _buffer.GetSuffix(reparseStart);
+
+    var parseResult =
+        _incrementalParser.ParseSuffix(
+            suffix,
+            _context.Document,
+            reparseStart);
+
+    var reconciledDocument =
+        _reconciler.ReconcileIncremental(
+            _context.Document,
+            parseResult.Document,
+            parseResult.ReusedBlockCount);
+
+    var diff =
+        _diffEngine.CompareIncremental(
+            _context.Document,
+            reconciledDocument,
+            parseResult.ReusedBlockCount);
+
+    _context.Document =
+        reconciledDocument;
+
+    _context.Version++;
+
+    return new MarkdownUpdate(
+        reconciledDocument,
+        diff,
+        MarkdownStreamResult.Streaming,
+        _context.Version);
+}
     public MarkdownUpdate Complete()
     {
         EnsureStreaming();
@@ -129,10 +145,10 @@ public sealed class MarkdownStreamProcessor
         _context.Version++;
 
         return new MarkdownUpdate(
-    reconciledDocument,
-    diff,
-    MarkdownStreamResult.Completed,
-    _context.Version);
+            reconciledDocument,
+            diff,
+            MarkdownStreamResult.Completed,
+            _context.Version);
     }
 
     public void Reset()
@@ -148,40 +164,40 @@ public sealed class MarkdownStreamProcessor
             MarkdownDocument.Empty;
     }
 
-public MarkdownUpdate Cancel()
-{
-    EnsureStreaming();
+    public MarkdownUpdate Cancel()
+    {
+        EnsureStreaming();
 
-    _context.State =
-        MarkdownStreamState.Cancelled;
+        _context.State =
+            MarkdownStreamState.Cancelled;
 
-    _context.Version++;
+        _context.Version++;
 
-    return new MarkdownUpdate(
-        _context.Document,
-        MarkdownDiff.Empty,
-        MarkdownStreamResult.Cancelled,
-        _context.Version);
-}
+        return new MarkdownUpdate(
+            _context.Document,
+            MarkdownDiff.Empty,
+            MarkdownStreamResult.Cancelled,
+            _context.Version);
+    }
 
-public MarkdownUpdate Fail(Exception exception)
-{
-    ArgumentNullException.ThrowIfNull(exception);
+    public MarkdownUpdate Fail(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
 
-    EnsureStreaming();
+        EnsureStreaming();
 
-    _context.State =
-        MarkdownStreamState.Failed;
+        _context.State =
+            MarkdownStreamState.Failed;
 
-    _context.Version++;
+        _context.Version++;
 
-    return new MarkdownUpdate(
-        MarkdownDocument.Empty,
-        MarkdownDiff.Empty,
-        MarkdownStreamResult.Failed,
-        _context.Version,
-        exception.Message);
-}
+        return new MarkdownUpdate(
+            MarkdownDocument.Empty,
+            MarkdownDiff.Empty,
+            MarkdownStreamResult.Failed,
+            _context.Version,
+            exception.Message);
+    }
 
     private void EnsureStreaming()
     {

@@ -100,6 +100,98 @@ public sealed class DocumentReconciler : IDocumentReconciler
         return new MarkdownDocument(result);
     }
 
+    public MarkdownDocument ReconcileIncremental(
+    MarkdownDocument previous,
+    MarkdownDocument current,
+    int reusedBlockCount)
+{
+    ArgumentNullException.ThrowIfNull(previous);
+    ArgumentNullException.ThrowIfNull(current);
+
+    ArgumentOutOfRangeException.ThrowIfNegative(
+        reusedBlockCount);
+
+    if (reusedBlockCount > previous.Blocks.Count)
+    {
+        throw new ArgumentOutOfRangeException(
+            nameof(reusedBlockCount));
+    }
+
+    if (reusedBlockCount > current.Blocks.Count)
+    {
+        throw new ArgumentOutOfRangeException(
+            nameof(reusedBlockCount));
+    }
+
+    var result =
+        new List<MarkdownBlock>(
+            current.Blocks.Count);
+
+    // Reuse the stable prefix while preserving the
+// identity of the corresponding previous blocks.
+for (var i = 0;
+     i < reusedBlockCount;
+     i++)
+{
+    result.Add(
+        RecreateWithId(
+            current.Blocks[i],
+            previous.Blocks[i].Id));
+}
+
+    // Only reconcile the affected suffix.
+    var previousSuffix =
+        previous.Blocks
+            .Skip(reusedBlockCount)
+            .ToList();
+
+    for (var currentIndex = reusedBlockCount;
+         currentIndex < current.Blocks.Count;
+         currentIndex++)
+    {
+        var currentBlock =
+            current.Blocks[currentIndex];
+
+        var localCurrentIndex =
+            currentIndex - reusedBlockCount;
+
+        var matchingPreviousIndex =
+            FindMatchingPreviousBlock(
+                previousSuffix,
+                currentBlock,
+                new HashSet<int>());
+
+        if (matchingPreviousIndex >= 0)
+        {
+            var previousBlock =
+                previousSuffix[matchingPreviousIndex];
+
+            result.Add(
+                RecreateWithId(
+                    currentBlock,
+                    previousBlock.Id));
+
+            continue;
+        }
+
+        // If there is a previous block at the same local
+        // position, treat this as modified content and
+        // preserve its identity.
+        if (localCurrentIndex < previousSuffix.Count)
+        {
+            result.Add(
+                RecreateWithId(
+                    currentBlock,
+                    previousSuffix[localCurrentIndex].Id));
+
+            continue;
+        }
+
+        result.Add(currentBlock);
+    }
+
+    return new MarkdownDocument(result);
+}
     private static int FindMatchingPreviousBlock(
         IReadOnlyList<MarkdownBlock> previousBlocks,
         MarkdownBlock currentBlock,
@@ -131,29 +223,37 @@ public sealed class DocumentReconciler : IDocumentReconciler
         {
             HeadingBlock heading =>
                 new HeadingBlock(
-                    heading.Position,
-                    heading.Level,
-                    heading.Inlines,
-                    id),
+    block.Position,
+    block.SourceStart,
+    block.SourceEnd,
+    heading.Level,
+    heading.Inlines,
+    id),
 
             ParagraphBlock paragraph =>
                 new ParagraphBlock(
-                    paragraph.Position,
-                    paragraph.Inlines,
-                    id),
+    block.Position,
+    block.SourceStart,
+    block.SourceEnd,
+    paragraph.Inlines,
+    id),
 
             ListBlock list =>
                 new ListBlock(
-                    list.Position,
-                    list.IsOrdered,
-                    list.Items,
-                    id),
+    block.Position,
+    block.SourceStart,
+    block.SourceEnd,
+    list.IsOrdered,
+    list.Items,
+    id),
 
             QuoteBlock quote =>
                 new QuoteBlock(
-                    quote.Position,
-                    quote.Blocks,
-                    id),
+    block.Position,
+    block.SourceStart,
+    block.SourceEnd,
+    quote.Blocks,
+    id),
 
             _ => throw new NotSupportedException(
                 $"Unsupported block type: {block.GetType().Name}")

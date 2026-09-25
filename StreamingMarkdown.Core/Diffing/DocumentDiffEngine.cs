@@ -107,6 +107,83 @@ public sealed class DocumentDiffEngine : IDocumentDiffEngine
         return new MarkdownDiff(changes);
     }
 
+    public MarkdownDiff CompareIncremental(
+    MarkdownDocument previous,
+    MarkdownDocument current,
+    int reusedBlockCount)
+    {
+        ArgumentNullException.ThrowIfNull(previous);
+        ArgumentNullException.ThrowIfNull(current);
+
+        ArgumentOutOfRangeException.ThrowIfNegative(
+            reusedBlockCount);
+
+        if (reusedBlockCount > previous.Blocks.Count)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(reusedBlockCount));
+        }
+
+        if (reusedBlockCount > current.Blocks.Count)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(reusedBlockCount));
+        }
+
+        var previousSuffix =
+            previous.Blocks
+                .Skip(reusedBlockCount)
+                .ToList();
+
+        var currentSuffix =
+            current.Blocks
+                .Skip(reusedBlockCount)
+                .ToList();
+
+        if (previousSuffix.Count == 0 &&
+            currentSuffix.Count == 0)
+        {
+            return MarkdownDiff.Empty;
+        }
+
+        var suffixDiff =
+            Compare(
+                new MarkdownDocument(previousSuffix),
+                new MarkdownDocument(currentSuffix));
+
+        if (!suffixDiff.HasChanges)
+        {
+            return MarkdownDiff.Empty;
+        }
+
+        var changes =
+            new List<MarkdownChange>(
+                suffixDiff.Changes.Count);
+
+        foreach (var change in suffixDiff.Changes)
+        {
+            var previousIndex =
+                change.PreviousIndex >= 0
+                    ? change.PreviousIndex + reusedBlockCount
+                    : -1;
+
+            var currentIndex =
+                change.CurrentIndex >= 0
+                    ? change.CurrentIndex + reusedBlockCount
+                    : -1;
+
+            changes.Add(
+                new MarkdownChange(
+                    change.Type,
+                    previousIndex,
+                    currentIndex,
+                    change.Previous,
+                    change.Current));
+        }
+
+        return new MarkdownDiff(changes);
+    }
+
     private static int[,] BuildLcsTable(
         IReadOnlyList<MarkdownBlock> previous,
         IReadOnlyList<MarkdownBlock> current)

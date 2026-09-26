@@ -131,14 +131,14 @@ public sealed class DocumentDiffEngine : IDocumentDiffEngine
         }
 
         var previousSuffix =
-            previous.Blocks
-                .Skip(reusedBlockCount)
-                .ToList();
+    new SuffixMarkdownBlockList(
+        previous.Blocks,
+        reusedBlockCount);
 
-        var currentSuffix =
-            current.Blocks
-                .Skip(reusedBlockCount)
-                .ToList();
+var currentSuffix =
+    new SuffixMarkdownBlockList(
+        current.Blocks,
+        reusedBlockCount);
 
         if (previousSuffix.Count == 0 &&
             currentSuffix.Count == 0)

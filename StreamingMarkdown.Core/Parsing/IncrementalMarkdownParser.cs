@@ -193,31 +193,32 @@ return new IncrementalParseResult(
             0);
     }
 
-    var reusableBlocks =
-        previousDocument.Blocks
-            .Take(reusableBlockCount)
-            .ToList();
-
-    var result =
-        new List<MarkdownBlock>(
-            reusableBlocks.Count);
-
-    result.AddRange(reusableBlocks);
-
     var parsedSuffix =
-        _fullParser.Parse(suffix);
+    _fullParser.Parse(suffix);
 
-    foreach (var block in parsedSuffix.Blocks)
-    {
-        result.Add(
-            OffsetBlock(
-                block,
-                reparseStart,
-                result.Count));
-    }
+var offsetSuffix =
+    new List<MarkdownBlock>(
+        parsedSuffix.Blocks.Count);
 
-    var incrementalDocument =
-        new MarkdownDocument(result);
+foreach (var block in parsedSuffix.Blocks)
+{
+    offsetSuffix.Add(
+        OffsetBlock(
+            block,
+            reparseStart,
+            reusableBlockCount +
+            offsetSuffix.Count));
+}
+
+var result =
+    new CompositeMarkdownBlockList(
+        new PrefixMarkdownBlockList(
+            previousDocument.Blocks,
+            reusableBlockCount),
+        offsetSuffix);
+
+var incrementalDocument =
+    new MarkdownDocument(result);
 
     var stableSourceEnd =
         previousDocument.Blocks[

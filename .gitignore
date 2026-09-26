@@ -164,3 +164,7 @@ coverage/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# BenchmarkDotNet generated artifacts
+BenchmarkDotNet.Artifacts/
+StreamingMarkdown.Benchmarks/BenchmarkDotNet.Artifacts/

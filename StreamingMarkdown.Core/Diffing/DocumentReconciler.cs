@@ -123,27 +123,20 @@ public sealed class DocumentReconciler : IDocumentReconciler
             nameof(reusedBlockCount));
     }
 
-    var result =
-        new List<MarkdownBlock>(
-            current.Blocks.Count);
+var previousPrefix =
+    new PrefixMarkdownBlockList(
+        previous.Blocks,
+        reusedBlockCount);
 
-    // Reuse the stable prefix while preserving the
-// identity of the corresponding previous blocks.
-for (var i = 0;
-     i < reusedBlockCount;
-     i++)
-{
-    result.Add(
-        RecreateWithId(
-            current.Blocks[i],
-            previous.Blocks[i].Id));
-}
+var result =
+    new List<MarkdownBlock>(
+        current.Blocks.Count - reusedBlockCount);
 
     // Only reconcile the affected suffix.
     var previousSuffix =
-        previous.Blocks
-            .Skip(reusedBlockCount)
-            .ToList();
+    new SuffixMarkdownBlockList(
+        previous.Blocks,
+        reusedBlockCount);
 
     for (var currentIndex = reusedBlockCount;
          currentIndex < current.Blocks.Count;
@@ -190,8 +183,16 @@ for (var i = 0;
         result.Add(currentBlock);
     }
 
-    return new MarkdownDocument(result);
+    var reconciledBlocks =
+    SegmentedMarkdownBlockList.Create(
+        previousPrefix,
+        result);
+
+return new MarkdownDocument(
+    reconciledBlocks);
 }
+
+
     private static int FindMatchingPreviousBlock(
         IReadOnlyList<MarkdownBlock> previousBlocks,
         MarkdownBlock currentBlock,

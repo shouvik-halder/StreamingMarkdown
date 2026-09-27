@@ -6,33 +6,32 @@ namespace StreamingMarkdown.Core.Streaming;
 public sealed class MarkdownStreamScheduler
 {
     private readonly MarkdownStreamProcessor _processor;
-
     private readonly object _sync = new();
-
     private readonly Queue<string> _pendingChunks = new();
 
     private CancellationTokenSource? _workerCancellation;
-
     private Task? _workerTask;
-
     private TaskCompletionSource<bool>? _processingCompletion;
 
     private bool _isProcessing;
-
     private bool _isCompleting;
-
     private bool _hasFailed;
 
     public event Action<MarkdownUpdate>? UpdateAvailable;
 
     public long ProcessedBatchCount { get; private set; }
 
+    public TimeSpan TotalProcessingTime { get; private set; }
+
+    public long ProcessedChunkCount { get; private set; }
+
     public MarkdownStreamScheduler(
         MarkdownStreamProcessor processor)
     {
-        ArgumentNullException.ThrowIfNull(processor);
-
-        _processor = processor;
+        _processor =
+            processor ??
+            throw new ArgumentNullException(
+                nameof(processor));
     }
 
     public MarkdownUpdate Begin()
@@ -42,18 +41,18 @@ public sealed class MarkdownStreamScheduler
             if (_workerTask is not null)
             {
                 throw new InvalidOperationException(
-                    "The Markdown stream is already active.");
+                    "A stream is already active.");
             }
 
             _pendingChunks.Clear();
 
-            _isCompleting = false;
             _isProcessing = false;
+            _isCompleting = false;
             _hasFailed = false;
 
-            _processingCompletion = null;
-
             ProcessedBatchCount = 0;
+            TotalProcessingTime = TimeSpan.Zero;
+            ProcessedChunkCount = 0;
 
             var update =
                 _processor.Begin();
@@ -66,8 +65,7 @@ public sealed class MarkdownStreamScheduler
 
             _workerTask =
                 Task.Run(
-                    () => ProcessLoopAsync(
-                        cancellationToken),
+                    () => ProcessLoopAsync(cancellationToken),
                     cancellationToken);
 
             return update;
@@ -78,19 +76,24 @@ public sealed class MarkdownStreamScheduler
     {
         ArgumentNullException.ThrowIfNull(chunk);
 
-        if (chunk.Length == 0)
-        {
-            return;
-        }
-
         lock (_sync)
         {
-            if (_workerTask is null ||
-                _isCompleting ||
-                _hasFailed)
+            if (_workerTask is null)
             {
                 throw new InvalidOperationException(
-                    "The Markdown stream is not active.");
+                    "The stream has not been started.");
+            }
+
+            if (_isCompleting)
+            {
+                throw new InvalidOperationException(
+                    "The stream is completing.");
+            }
+
+            if (_hasFailed)
+            {
+                throw new InvalidOperationException(
+                    "The stream has failed.");
             }
 
             _pendingChunks.Enqueue(chunk);
@@ -100,47 +103,31 @@ public sealed class MarkdownStreamScheduler
     public async Task CompleteAsync(
         CancellationToken cancellationToken = default)
     {
-        Task? processingTask;
-
         lock (_sync)
         {
-            if (_workerTask is null ||
-                _isCompleting ||
-                _hasFailed)
+            if (_workerTask is null)
             {
                 throw new InvalidOperationException(
-                    "The Markdown stream is not active.");
+                    "The stream has not been started.");
+            }
+
+            if (_hasFailed)
+            {
+                throw new InvalidOperationException(
+                    "The stream has already failed.");
             }
 
             _isCompleting = true;
-
-            processingTask =
-                _processingCompletion?.Task;
         }
 
-        // Wait for any currently running processor operation.
-        if (processingTask is not null)
-        {
-            await processingTask.WaitAsync(
-                cancellationToken);
-        }
-
-        // Process anything that arrived before completion.
-        await ProcessPendingAsync(
-            cancellationToken);
-
-        // A second check is required because another worker
-        // operation could have started while we were processing.
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Task? processingTask;
+
             lock (_sync)
             {
-                if (!_isProcessing &&
-                    _pendingChunks.Count == 0)
-                {
-                    break;
-                }
-
                 processingTask =
                     _processingCompletion?.Task;
             }
@@ -153,68 +140,104 @@ public sealed class MarkdownStreamScheduler
 
             await ProcessPendingAsync(
                 cancellationToken);
+
+            lock (_sync)
+            {
+                if (!_isProcessing &&
+                    _pendingChunks.Count == 0)
+                {
+                    break;
+                }
+            }
         }
 
-        MarkdownUpdate? update;
-        bool failed;
+        MarkdownUpdate completedUpdate;
+
+        try
+        {
+            completedUpdate =
+                _processor.Complete();
+        }
+        catch (Exception exception)
+        {
+            completedUpdate =
+                _processor.Fail(exception);
+
+            lock (_sync)
+            {
+                _hasFailed = true;
+            }
+        }
+
+        UpdateAvailable?.Invoke(
+            completedUpdate);
+
+        _workerCancellation?.Cancel();
+
+        await StopWorkerAsync();
+    }
+
+    public async Task CancelAsync(
+        CancellationToken cancellationToken = default)
+    {
+        Task? processingTask;
 
         lock (_sync)
         {
-            failed = _hasFailed;
+            if (_workerTask is null)
+            {
+                return;
+            }
 
-            if (failed)
-            {
-                update = null;
-            }
-            else
-            {
-                update =
-                    _processor.Complete();
-            }
+            _isCompleting = true;
+
+            _pendingChunks.Clear();
 
             _workerCancellation?.Cancel();
+
+            processingTask =
+                _processingCompletion?.Task;
         }
 
-        if (failed)
+        if (processingTask is not null)
         {
-            await StopWorkerAsync();
-
-            throw new InvalidOperationException(
-                "The Markdown stream has failed.");
+            await processingTask.WaitAsync(
+                cancellationToken);
         }
 
-        UpdateAvailable?.Invoke(update!);
+        var cancelledUpdate =
+            _processor.Cancel();
+
+        UpdateAvailable?.Invoke(
+            cancelledUpdate);
 
         await StopWorkerAsync();
     }
 
     public void Reset()
     {
-        CancellationTokenSource? cancellation;
-
         lock (_sync)
         {
-            cancellation =
-                _workerCancellation;
-
-            cancellation?.Cancel();
+            _workerCancellation?.Cancel();
 
             _pendingChunks.Clear();
 
-            _isCompleting = false;
             _isProcessing = false;
+            _isCompleting = false;
             _hasFailed = false;
 
+            ProcessedBatchCount = 0;
+            TotalProcessingTime = TimeSpan.Zero;
+            ProcessedChunkCount = 0;
+
             _processingCompletion = null;
-
-            _processor.Reset();
-
             _workerTask = null;
 
+            _workerCancellation?.Dispose();
             _workerCancellation = null;
-        }
 
-        cancellation?.Dispose();
+            _processor.Reset();
+        }
     }
 
     private async Task ProcessLoopAsync(
@@ -234,8 +257,8 @@ public sealed class MarkdownStreamScheduler
         }
         catch (OperationCanceledException)
         {
-            // Expected when the stream completes,
-            // fails, is cancelled, or resets.
+            // Expected when the stream is completed,
+            // cancelled, or reset.
         }
     }
 
@@ -243,6 +266,7 @@ public sealed class MarkdownStreamScheduler
         CancellationToken cancellationToken)
     {
         string? combinedChunk = null;
+        var batchChunkCount = 0;
 
         TaskCompletionSource<bool>? completionSource = null;
 
@@ -270,6 +294,8 @@ public sealed class MarkdownStreamScheduler
             {
                 builder.Append(
                     _pendingChunks.Dequeue());
+
+                batchChunkCount++;
             }
 
             combinedChunk =
@@ -286,19 +312,33 @@ public sealed class MarkdownStreamScheduler
 
             try
             {
+                var processingStopwatch =
+                    System.Diagnostics.Stopwatch.StartNew();
+
                 update =
                     _processor.Append(
                         combinedChunk);
+
+                processingStopwatch.Stop();
+
+                lock (_sync)
+                {
+                    TotalProcessingTime +=
+                        processingStopwatch.Elapsed;
+
+                    ProcessedChunkCount +=
+                        batchChunkCount;
+                }
             }
             catch (Exception exception)
             {
                 update =
-                    _processor.Fail(exception);
+                    _processor.Fail(
+                        exception);
 
                 lock (_sync)
                 {
                     _hasFailed = true;
-
                     _isCompleting = true;
 
                     _pendingChunks.Clear();
@@ -307,7 +347,8 @@ public sealed class MarkdownStreamScheduler
                 }
             }
 
-            UpdateAvailable?.Invoke(update);
+            UpdateAvailable?.Invoke(
+                update);
         }
         finally
         {
@@ -323,95 +364,45 @@ public sealed class MarkdownStreamScheduler
                 }
             }
 
-            completionSource.TrySetResult(true);
+            completionSource.TrySetResult(
+                true);
         }
     }
 
     private async Task StopWorkerAsync()
     {
-        Task? worker;
-        CancellationTokenSource? cancellation;
+        Task? workerTask;
 
         lock (_sync)
         {
-            worker =
+            workerTask =
                 _workerTask;
-
-            cancellation =
-                _workerCancellation;
-
-            _workerTask = null;
-            _workerCancellation = null;
         }
 
-        cancellation?.Cancel();
-
-        if (worker is not null)
+        if (workerTask is not null)
         {
             try
             {
-                await worker;
+                await workerTask;
             }
             catch (OperationCanceledException)
             {
-                // Expected during completion/reset/failure.
+                // Expected during shutdown.
             }
         }
 
-        cancellation?.Dispose();
-    }
-
-    public async Task CancelAsync(
-        CancellationToken cancellationToken = default)
-    {
-        CancellationTokenSource? cancellation;
-
         lock (_sync)
         {
-            if (_workerTask is null ||
-                _isCompleting ||
-                _hasFailed)
+            if (ReferenceEquals(
+                _workerTask,
+                workerTask))
             {
-                throw new InvalidOperationException(
-                    "The Markdown stream is not active.");
+                _workerTask = null;
+
+                _workerCancellation?.Dispose();
+
+                _workerCancellation = null;
             }
-
-            _isCompleting = true;
-
-            // Anything waiting in the queue should not be
-            // processed after cancellation.
-            _pendingChunks.Clear();
-
-            cancellation =
-                _workerCancellation;
         }
-
-        cancellation?.Cancel();
-
-        Task? processingTask;
-
-        lock (_sync)
-        {
-            processingTask =
-                _processingCompletion?.Task;
-        }
-
-        if (processingTask is not null)
-        {
-            await processingTask.WaitAsync(
-                cancellationToken);
-        }
-
-        MarkdownUpdate update;
-
-        lock (_sync)
-        {
-            update =
-                _processor.Cancel();
-        }
-
-        UpdateAvailable?.Invoke(update);
-
-        await StopWorkerAsync();
     }
 }

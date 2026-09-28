@@ -18,6 +18,7 @@ using MarkdigInline = Markdig.Syntax.Inlines.Inline;
 using MarkdigLiteralInline = Markdig.Syntax.Inlines.LiteralInline;
 using MarkdigEmphasisInline = Markdig.Syntax.Inlines.EmphasisInline;
 using MarkdigLinkInline = Markdig.Syntax.Inlines.LinkInline;
+using MarkdigLineBreakInline = Markdig.Syntax.Inlines.LineBreakInline;
 
 namespace StreamingMarkdown.Core.Parsing;
 
@@ -246,24 +247,27 @@ public sealed class MarkdigMarkdownParser : IMarkdownParser
         return result;
     }
 
-    private static MarkdownInline? ParseInline(
-        MarkdigInline inline)
+private static MarkdownInline? ParseInline(
+    MarkdigInline inline)
+{
+    return inline switch
     {
-        return inline switch
-        {
-            MarkdigLiteralInline literal =>
-                new TextInline(
-                    literal.Content.ToString()),
+        MarkdigLiteralInline literal =>
+            new TextInline(
+                literal.Content.ToString()),
 
-            MarkdigEmphasisInline emphasis =>
-                ParseEmphasis(emphasis),
+        MarkdigLineBreakInline =>
+            new TextInline(" "),
 
-            MarkdigLinkInline link =>
-                ParseLink(link),
+        MarkdigEmphasisInline emphasis =>
+            ParseEmphasis(emphasis),
 
-            _ => CreateFallbackInline(inline)
-        };
-    }
+        MarkdigLinkInline link =>
+            ParseLink(link),
+
+        _ => CreateFallbackInline(inline)
+    };
+}
 
     private static MarkdownInline ParseEmphasis(
         MarkdigEmphasisInline emphasis)

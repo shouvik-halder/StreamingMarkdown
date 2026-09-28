@@ -68,11 +68,7 @@ public sealed class MarkdownView : ContentView
         _state =
             new MarkdownViewState();
 
-        Content =
-            new ScrollView
-            {
-                Content = _layout
-            };
+        Content = _layout;
     }
 
     private static void OnDocumentChanged(

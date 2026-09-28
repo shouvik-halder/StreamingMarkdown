@@ -161,115 +161,122 @@ private async void StartStreaming()
     // Finite, realistic Markdown response
     // --------------------------------------------------
 
-    var markdown =
-        """
-        # Streaming Markdown Performance Test
+var baseMarkdown =
+    """
+    # Streaming Markdown Performance Test
 
-        This is a realistic **AI-generated streaming response** used to measure
-        incremental parsing, document reconciliation, diffing, scheduling, and
-        MAUI rendering performance.
+    This is a realistic **AI-generated streaming response** used to measure
+    incremental parsing, document reconciliation, diffing, scheduling, and
+    MAUI rendering performance.
 
-        ## Overview
+    ## Overview
 
-        The renderer receives Markdown progressively instead of receiving the
-        complete document at once. Each event contains a small portion of the
-        response, and the scheduler combines pending events before processing.
+    The renderer receives Markdown progressively instead of receiving the
+    complete document at once. Each event contains a small portion of the
+    response, and the scheduler combines pending events before processing.
 
-        The renderer should preserve previously rendered blocks whenever possible
-        and update only the portion of the document that has changed.
+    The renderer should preserve previously rendered blocks whenever possible
+    and update only the portion of the document that has changed.
 
-        ## Features
+    ## Features
 
-        - Incremental Markdown parsing
-        - Stable document reconciliation
-        - Incremental document diffing
-        - View reuse
-        - Append-only rendering
-        - Modified block updates
-        - Structural change handling
-        - Scheduler-based chunk coalescing
+    - Incremental Markdown parsing
+    - Stable document reconciliation
+    - Incremental document diffing
+    - View reuse
+    - Append-only rendering
+    - Modified block updates
+    - Structural change handling
+    - Scheduler-based chunk coalescing
 
-        ## Formatting
+    ## Formatting
 
-        This paragraph contains **bold text**, *italic text*, and
-        [a hyperlink](https://example.com).
+    This paragraph contains **bold text**, *italic text*, and
+    [a hyperlink](https://example.com).
 
-        > This is a block quote containing **formatted text** and additional
-        > content that exercises the quote renderer.
+    > This is a block quote containing **formatted text** and additional
+    > content that exercises the quote renderer.
 
-        ## Processing Model
+    ## Processing Model
 
-        The streaming pipeline receives chunks from an external source.
+    The streaming pipeline receives chunks from an external source.
 
-        Each chunk is placed into the scheduler queue. The scheduler periodically
-        combines pending chunks into a single processing batch. The processor then
-        updates the Markdown document and produces a Markdown update.
+    Each chunk is placed into the scheduler queue. The scheduler periodically
+    combines pending chunks into a single processing batch. The processor then
+    updates the Markdown document and produces a Markdown update.
 
-        The MAUI layer receives the update and applies only the required changes
-        to the existing visual tree.
+    The MAUI layer receives the update and applies only the required changes
+    to the existing visual tree.
 
-        ## Lists
+    ## Lists
 
-        - First item
-        - Second item
-        - Third item
-        - Fourth item
-        - Fifth item
+    - First item
+    - Second item
+    - Third item
+    - Fourth item
+    - Fifth item
 
-        ### Ordered Items
+    ### Ordered Items
 
-        1. Parse incoming Markdown
-        2. Reconcile the document
-        3. Calculate the document diff
-        4. Apply the visual changes
-        5. Continue receiving the stream
+    1. Parse incoming Markdown
+    2. Reconcile the document
+    3. Calculate the document diff
+    4. Apply the visual changes
+    5. Continue receiving the stream
 
-        ## Performance
+    ## Performance
 
-        The purpose of this test is to determine whether processing time and
-        UI rendering time scale reasonably as the document grows.
+    The purpose of this test is to determine whether processing time and
+    UI rendering time scale reasonably as the document grows.
 
-        A production AI response can contain headings, paragraphs, lists,
-        emphasis, links, and quotations. The benchmark therefore uses a mixture
-        of these structures instead of repeatedly appending the same block.
+    A production AI response can contain headings, paragraphs, lists,
+    emphasis, links, and quotations. The benchmark therefore uses a mixture
+    of these structures instead of repeatedly appending the same block.
 
-        ## Streaming Behaviour
+    ## Streaming Behaviour
 
-        During streaming, an incomplete paragraph may be modified many times
-        before the response reaches a stable state.
+    During streaming, an incomplete paragraph may be modified many times
+    before the response reaches a stable state.
 
-        Previously rendered blocks should remain intact whenever possible.
-        Modified blocks should reuse their existing MAUI views rather than
-        creating new views unnecessarily.
+    Previously rendered blocks should remain intact whenever possible.
+    Modified blocks should reuse their existing MAUI views rather than
+    creating new views unnecessarily.
 
-        Append-only additions should also avoid unnecessary layout reordering.
+    Append-only additions should also avoid unnecessary layout reordering.
 
-        ## Additional Content
+    ## Additional Content
 
-        Streaming Markdown is particularly useful for AI-generated responses
-        because text arrives progressively. A renderer that rebuilds the entire
-        visual tree for every incoming event can become increasingly expensive.
+    Streaming Markdown is particularly useful for AI-generated responses
+    because text arrives progressively. A renderer that rebuilds the entire
+    visual tree for every incoming event can become increasingly expensive.
 
-        Incremental rendering instead attempts to keep the existing visual tree
-        stable and update only the affected portions.
+    Incremental rendering instead attempts to keep the existing visual tree
+    stable and update only the affected portions.
 
-        The scheduler should be able to receive many small chunks while keeping
-        the number of UI updates under control.
+    The scheduler should be able to receive many small chunks while keeping
+    the number of UI updates under control.
 
-        The renderer should remain responsive while the response is arriving.
-        The important measurement is not simply how quickly one chunk is parsed,
-        but whether the complete pipeline can continuously accept incoming data
-        without creating an ever-growing processing backlog.
+    The renderer should remain responsive while the response is arriving.
+    The important measurement is not simply how quickly one chunk is parsed,
+    but whether the complete pipeline can continuously accept incoming data
+    without creating an ever-growing processing backlog.
 
-        ## Conclusion
+    ## Conclusion
 
-        This benchmark measures a finite Markdown response streamed progressively.
-        It does not artificially duplicate the same blocks thousands of times.
+    This benchmark measures a finite Markdown response streamed progressively.
+    It does not artificially duplicate the same blocks thousands of times.
 
-        The goal is to verify that the implementation can sustain a realistic
-        streaming workload while maintaining responsive MAUI rendering.
-        """;
+    The goal is to verify that the implementation can sustain a realistic
+    streaming workload while maintaining responsive MAUI rendering.
+    """;
 
+var markdown =
+    string.Join(
+        "\n\n",
+        baseMarkdown,
+        baseMarkdown,
+        baseMarkdown,
+        baseMarkdown);
     // --------------------------------------------------
     // Split response into streaming chunks
     // --------------------------------------------------

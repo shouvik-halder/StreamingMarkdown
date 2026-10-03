@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:markdown="clr-namespace:StreamingMarkdown.Maui.Controls;assembly=StreamingMarkdown.Maui"
+    xmlns:models="clr-namespace:StreamingMarkdown.Maui.TestApp.Features.Chat.Models"
+    x:Class="StreamingMarkdown.Maui.TestApp.Features.Chat.Views.ChatPage"
+    Title="Chat"
+    BackgroundColor="#F8FAFC">
+
+    <Grid RowDefinitions="*,Auto"
+          RowSpacing="0">
+
+        <!-- Conversation -->
+        <CollectionView
+            x:Name="MessagesList"
+            Grid.Row="0"
+            ItemsSource="{Binding Messages}"
+            SelectionMode="None"
+            ItemsUpdatingScrollMode="KeepLastItemInView"
+            ItemSizingStrategy="MeasureAllItems">
+
+            <CollectionView.EmptyView>
+                <VerticalStackLayout
+                    Padding="28"
+                    Spacing="10"
+                    VerticalOptions="Center"
+                    HorizontalOptions="Center">
+
+                    <Label
+                        Text="Start a conversation"
+                        FontSize="22"
+                        FontAttributes="Bold"
+                        HorizontalTextAlignment="Center"
+                        TextColor="#1E293B"/>
+
+                    <Label
+                        Text="Send a message to test progressive Markdown rendering."
+                        FontSize="14"
+                        HorizontalTextAlignment="Center"
+                        TextColor="#64748B"/>
+                </VerticalStackLayout>
+            </CollectionView.EmptyView>
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:ChatMessageViewModel">
+
+                    <Grid Padding="12,8"
+                          ColumnDefinitions="*,Auto">
+
+                        <!-- Message content -->
+                        <Border
+                            Grid.Column="0"
+                            Grid.ColumnSpan="2"
+                            HorizontalOptions="Start"
+                            MaximumWidthRequest="620"
+                            Padding="14,10"
+                            Stroke="#E2E8F0"
+                            StrokeThickness="1"
+                            BackgroundColor="White"
+                            StrokeShape="RoundRectangle 18">
+
+                            <Border.Triggers>
+                                <DataTrigger
+                                    TargetType="Border"
+                                    Binding="{Binding IsUser}"
+                                    Value="True">
+                                    <Setter Property="Grid.Column"
+                                            Value="1"/>
+                                    <Setter Property="Grid.ColumnSpan"
+                                            Value="1"/>
+                                    <Setter Property="HorizontalOptions"
+                                            Value="End"/>
+                                    <Setter Property="BackgroundColor"
+                                            Value="#1769D2"/>
+                                    <Setter Property="Stroke"
+                                            Value="#1769D2"/>
+                                </DataTrigger>
+                            </Border.Triggers>
+
+                            <VerticalStackLayout Spacing="8">
+
+                                <!-- User message -->
+                                <Label
+                                    Text="{Binding Text}"
+                                    IsVisible="{Binding IsUser}"
+                                    TextColor="#FFFFFF"
+                                    FontSize="15"
+                                    LineBreakMode="WordWrap"/>
+
+                                <!-- Assistant Markdown -->
+                                <markdown:MarkdownView
+                                    Source="{Binding MarkdownSession}"
+                                    IsVisible="{Binding IsAssistant}"/>
+
+                                <!-- Error state -->
+                                <Label
+                                    Text="{Binding ErrorMessage}"
+                                    IsVisible="{Binding HasError}"
+                                    TextColor="#B91C1C"
+                                    FontSize="13"/>
+
+                                <!-- Streaming indicator -->
+                                <HorizontalStackLayout
+                                    IsVisible="{Binding IsStreaming}"
+                                    Spacing="8">
+
+                                    <ActivityIndicator
+                                        IsRunning="{Binding IsStreaming}"
+                                        WidthRequest="18"
+                                        HeightRequest="18"
+                                        Color="#64748B"/>
+
+                                    <Label
+                                        Text="Generating response..."
+                                        FontSize="12"
+                                        TextColor="#64748B"
+                                        VerticalOptions="Center"/>
+                                </HorizontalStackLayout>
+
+                                <!-- Suggested replies -->
+                                <FlexLayout
+                                    BindableLayout.ItemsSource="{Binding SuggestedReplies}"
+                                    Direction="Row"
+                                    Wrap="Wrap"
+                                    JustifyContent="Start"
+                                    AlignItems="Start">
+
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="models:SuggestedReply">
+                                            <Button
+                                                    Text="{Binding Text}"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type Border}},
+                                                                    Path=BindingContext.SuggestedReplyCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    Margin="0,4,6,4"
+                                                    Padding="12,8"
+                                                    FontSize="13"
+                                                    CornerRadius="12"
+                                                    BackgroundColor="White"
+                                                    TextColor="#1769D2"
+                                                    BorderColor="#1769D2"
+                                                    BorderWidth="1" />
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </FlexLayout>
+
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Fixed composer -->
+        <Border
+            Grid.Row="1"
+            Padding="12"
+            BackgroundColor="White"
+            Stroke="#E2E8F0"
+            StrokeThickness="1">
+
+            <Grid RowDefinitions="Auto,Auto"
+                  ColumnDefinitions="*,Auto"
+                  ColumnSpacing="10"
+                  RowSpacing="8">
+
+                <Editor
+                    Grid.Row="0"
+                    Grid.Column="0"
+                    Grid.ColumnSpan="2"
+                    Text="{Binding InputText, Mode=TwoWay}"
+                    Placeholder="Message the assistant..."
+                    AutoSize="TextChanges"
+                    MinimumHeightRequest="44"
+                    MaximumHeightRequest="140"
+                    BackgroundColor="#FFFFFF"
+                    TextColor="#1E293B"
+                    PlaceholderColor="#94A3B8"/>
+
+                <Label
+                    Grid.Row="1"
+                    Grid.Column="0"
+                    Text="{Binding Status}"
+                    FontSize="12"
+                    TextColor="#64748B"
+                    VerticalOptions="Center"/>
+
+                <HorizontalStackLayout
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    Spacing="8">
+                    <!-- <ImageButton 
+                        CornerRadius="17" 
+                        HeightRequest="35" 
+                        WidthRequest="35" Source="" /> -->
+
+                    <Button
+                        Text="Cancel"
+                        Command="{Binding CancelCommand}"
+                        IsVisible="{Binding IsBusy}"
+                        Padding="12,8"
+                        CornerRadius="18"
+                        BackgroundColor="#F1F5F9"
+                        TextColor="#334155"/>
+
+                    <Button
+                        Text="&#x2191;" FontAttributes="Bold"
+                        Command="{Binding SendCommand}"
+                        IsEnabled="{Binding IsNotBusy}"
+                        
+                        CornerRadius="18"
+                        BackgroundColor="#1769D2"
+                        TextColor="White"/>
+
+                </HorizontalStackLayout>
+            </Grid>
+        </Border>
+    </Grid>
+</ContentPage>

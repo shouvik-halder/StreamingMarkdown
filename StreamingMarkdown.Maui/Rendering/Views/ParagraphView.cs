@@ -29,6 +29,8 @@ internal sealed class ParagraphView : IMarkdownBlockView
         _label =
             new Label
             {
+                FontFamily = _style.FontFamily,
+                
                 FontSize =
                     _style.BodyFontSize,
 
@@ -40,7 +42,9 @@ internal sealed class ParagraphView : IMarkdownBlockView
                         0,
                         0,
                         0,
-                        _style.BlockSpacing)
+                        _style.BlockSpacing),
+                        
+                TextColor = _style.TextColor
             };
 
         Update(block);

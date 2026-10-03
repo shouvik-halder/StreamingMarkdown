@@ -26,12 +26,14 @@ internal sealed class HeadingView : IMarkdownBlockView
 
         _label = new Label
         {
+            FontFamily = _style.FontFamily,
             LineBreakMode = LineBreakMode.WordWrap,
             Margin = new Thickness(
                 0,
                 0,
                 0,
-                _style.BlockSpacing)
+                _style.BlockSpacing),
+            TextColor=_style.TextColor
         };
 
         Update(block);

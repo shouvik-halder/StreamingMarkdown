@@ -1,4 +1,6 @@
 using System.Text;
+using StreamingMarkdown.Core.Diffing;
+using StreamingMarkdown.Core.Parsing;
 using StreamingMarkdown.Core.Results;
 
 namespace StreamingMarkdown.Core.Streaming;
@@ -16,6 +18,17 @@ public sealed class MarkdownStreamScheduler
     private bool _isProcessing;
     private bool _isCompleting;
     private bool _hasFailed;
+    private Exception? _failureException;
+    private Task? _terminalTask;
+    private enum TerminalOperation
+{
+    None,
+    Completing,
+    Cancelling
+}
+
+private TerminalOperation _terminalOperation;
+private bool _isResetting;
 
     public event Action<MarkdownUpdate>? UpdateAvailable;
 
@@ -38,17 +51,33 @@ public sealed class MarkdownStreamScheduler
     {
         lock (_sync)
         {
+            if (_isResetting)
+            {
+                throw new InvalidOperationException(
+                    "The stream is being reset.");
+            }
+
             if (_workerTask is not null)
             {
                 throw new InvalidOperationException(
                     "A stream is already active.");
             }
 
+            if (_terminalTask is { IsCompleted: false })
+            {
+                throw new InvalidOperationException(
+                    "The previous stream operation has not finished.");
+            }
+
+            _terminalTask = null;
+            _terminalOperation = TerminalOperation.None;
+
             _pendingChunks.Clear();
 
             _isProcessing = false;
             _isCompleting = false;
             _hasFailed = false;
+            _failureException = null;
 
             ProcessedBatchCount = 0;
             TotalProcessingTime = TimeSpan.Zero;
@@ -95,15 +124,36 @@ public sealed class MarkdownStreamScheduler
                 throw new InvalidOperationException(
                     "The stream has failed.");
             }
+            if (_isResetting)
+            {
+                throw new InvalidOperationException(
+                    "The stream is being reset.");
+            }
 
             _pendingChunks.Enqueue(chunk);
         }
     }
 
     public async Task CompleteAsync(
-        CancellationToken cancellationToken = default)
+    CancellationToken cancellationToken = default)
+{
+    Task operation;
+
+    lock (_sync)
     {
-        lock (_sync)
+        if (_isResetting)
+        {
+            throw new InvalidOperationException(
+                "The stream is being reset.");
+        }
+
+        if (_terminalOperation == TerminalOperation.Cancelling)
+        {
+            throw new InvalidOperationException(
+                "The stream has been cancelled.");
+        }
+
+        if (_terminalTask is null)
         {
             if (_workerTask is null)
             {
@@ -111,135 +161,141 @@ public sealed class MarkdownStreamScheduler
                     "The stream has not been started.");
             }
 
-            if (_hasFailed)
-            {
-                throw new InvalidOperationException(
-                    "The stream has already failed.");
-            }
+            _isCompleting = true;
+            _terminalOperation = TerminalOperation.Completing;
+            _terminalTask = Task.Run(CompleteCoreAsync);
+        }
+
+        operation = _terminalTask;
+    }
+
+    await operation.WaitAsync(cancellationToken)
+        .ConfigureAwait(false);
+}
+
+    public async Task CancelAsync(
+    CancellationToken cancellationToken = default)
+{
+    Task? operation;
+
+    lock (_sync)
+    {
+        if (_isResetting)
+        {
+            throw new InvalidOperationException(
+                "The stream is being reset.");
+        }
+
+        if (_terminalOperation == TerminalOperation.Completing)
+        {
+            throw new InvalidOperationException(
+                "Cannot cancel while completion is in progress.");
+        }
+
+        if (_terminalTask is null)
+        {
+            if (_workerTask is null)
+                return;
 
             _isCompleting = true;
+            _terminalOperation = TerminalOperation.Cancelling;
+            _terminalTask = Task.Run(CancelCoreAsync);
         }
-
-        while (true)
+        else if (_terminalOperation != TerminalOperation.Cancelling)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            Task? processingTask;
-
-            lock (_sync)
-            {
-                processingTask =
-                    _processingCompletion?.Task;
-            }
-
-            if (processingTask is not null)
-            {
-                await processingTask.WaitAsync(
-                    cancellationToken);
-            }
-
-            await ProcessPendingAsync(
-                cancellationToken);
-
-            lock (_sync)
-            {
-                if (!_isProcessing &&
-                    _pendingChunks.Count == 0)
-                {
-                    break;
-                }
-            }
+            throw new InvalidOperationException(
+                "The stream is not available for cancellation.");
         }
 
-        MarkdownUpdate completedUpdate;
+        operation = _terminalTask;
+    }
+
+    if (operation is not null)
+    {
+        await operation.WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+}
+    public void Reset()
+    {
+        Task? workerTask;
+        Task? processingTask;
+        CancellationTokenSource? workerCancellation;
+
+        lock (_sync)
+        {
+            if (_isResetting)
+            {
+                throw new InvalidOperationException(
+                    "The stream is already being reset.");
+            }
+
+            if (_terminalTask is { IsCompleted: false })
+            {
+                throw new InvalidOperationException(
+                    "Cannot reset while completion or cancellation " +
+                    "is in progress.");
+            }
+
+            _isResetting = true;
+            _isCompleting = true;
+            _pendingChunks.Clear();
+
+            workerTask = _workerTask;
+            processingTask = _processingCompletion?.Task;
+            workerCancellation = _workerCancellation;
+
+            workerCancellation?.Cancel();
+        }
 
         try
         {
-            completedUpdate =
-                _processor.Complete();
-        }
-        catch (Exception exception)
-        {
-            completedUpdate =
-                _processor.Fail(exception);
+            processingTask?.GetAwaiter().GetResult();
+
+            if (workerTask is not null)
+            {
+                try
+                {
+                    workerTask.GetAwaiter().GetResult();
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected: Reset cancels the worker.
+                }
+            }
 
             lock (_sync)
             {
-                _hasFailed = true;
+                _processor.Reset();
+
+                _pendingChunks.Clear();
+
+                _isProcessing = false;
+                _isCompleting = false;
+                _hasFailed = false;
+                _failureException = null;
+
+                ProcessedBatchCount = 0;
+                TotalProcessingTime = TimeSpan.Zero;
+                ProcessedChunkCount = 0;
+
+                _processingCompletion = null;
+                _workerTask = null;
+                _terminalTask = null;
+                _terminalOperation = TerminalOperation.None;
+
+                _workerCancellation = null;
+                workerCancellation?.Dispose();
             }
         }
-
-        UpdateAvailable?.Invoke(
-            completedUpdate);
-
-        _workerCancellation?.Cancel();
-
-        await StopWorkerAsync();
-    }
-
-    public async Task CancelAsync(
-        CancellationToken cancellationToken = default)
-    {
-        Task? processingTask;
-
-        lock (_sync)
+        finally
         {
-            if (_workerTask is null)
+            lock (_sync)
             {
-                return;
+                _isResetting = false;
             }
-
-            _isCompleting = true;
-
-            _pendingChunks.Clear();
-
-            _workerCancellation?.Cancel();
-
-            processingTask =
-                _processingCompletion?.Task;
-        }
-
-        if (processingTask is not null)
-        {
-            await processingTask.WaitAsync(
-                cancellationToken);
-        }
-
-        var cancelledUpdate =
-            _processor.Cancel();
-
-        UpdateAvailable?.Invoke(
-            cancelledUpdate);
-
-        await StopWorkerAsync();
-    }
-
-    public void Reset()
-    {
-        lock (_sync)
-        {
-            _workerCancellation?.Cancel();
-
-            _pendingChunks.Clear();
-
-            _isProcessing = false;
-            _isCompleting = false;
-            _hasFailed = false;
-
-            ProcessedBatchCount = 0;
-            TotalProcessingTime = TimeSpan.Zero;
-            ProcessedChunkCount = 0;
-
-            _processingCompletion = null;
-            _workerTask = null;
-
-            _workerCancellation?.Dispose();
-            _workerCancellation = null;
-
-            _processor.Reset();
         }
     }
-
     private async Task ProcessLoopAsync(
         CancellationToken cancellationToken)
     {
@@ -255,10 +311,26 @@ public sealed class MarkdownStreamScheduler
                     cancellationToken);
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Expected when the stream is completed,
-            // cancelled, or reset.
+            // Expected when the stream is completed, cancelled, or reset.
+        }
+        catch (Exception exception)
+        {
+            // Never let an unexpected worker exception disappear. The terminal
+            // operation observes this recorded failure and reports it to callers.
+            RecordFailure(exception);
+        }
+    }
+
+    private void RecordFailure(Exception exception)
+    {
+        lock (_sync)
+        {
+            _hasFailed = true;
+            _failureException ??= exception;
+            _isCompleting = true;
+            _pendingChunks.Clear();
         }
     }
 
@@ -306,7 +378,10 @@ public sealed class MarkdownStreamScheduler
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            ProcessedBatchCount++;
+            lock (_sync)
+            {
+                ProcessedBatchCount++;
+            }
 
             MarkdownUpdate update;
 
@@ -332,23 +407,34 @@ public sealed class MarkdownStreamScheduler
             }
             catch (Exception exception)
             {
-                update =
-                    _processor.Fail(
-                        exception);
-
                 lock (_sync)
                 {
                     _hasFailed = true;
+                    _failureException ??= exception;
                     _isCompleting = true;
-
                     _pendingChunks.Clear();
-
                     _workerCancellation?.Cancel();
+                }
+
+                try
+                {
+                    update = _processor.Fail(exception);
+                }
+                catch (Exception failureException)
+                {
+                    lock (_sync)
+                    {
+                        _failureException = new AggregateException(
+                            "Chunk processing and error recovery both failed.",
+                            exception,
+                            failureException);
+                    }
+
+                    throw;
                 }
             }
 
-            UpdateAvailable?.Invoke(
-                update);
+            PublishUpdate(update);
         }
         finally
         {
@@ -379,30 +465,214 @@ public sealed class MarkdownStreamScheduler
                 _workerTask;
         }
 
-        if (workerTask is not null)
+        Exception? workerFailure = null;
+
+        try
+        {
+            if (workerTask is not null)
+            {
+                try
+                {
+                    await workerTask.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected during shutdown.
+                }
+                catch (Exception exception)
+                {
+                    workerFailure = exception;
+                    RecordFailure(exception);
+                }
+            }
+        }
+        finally
+        {
+            lock (_sync)
+            {
+                if (ReferenceEquals(_workerTask, workerTask))
+                {
+                    _workerTask = null;
+                    _workerCancellation?.Dispose();
+                    _workerCancellation = null;
+                }
+            }
+        }
+
+        if (workerFailure is not null)
+        {
+            throw new InvalidOperationException(
+                "The markdown processing worker failed.",
+                workerFailure);
+        }
+    }
+
+    private async Task CompleteCoreAsync()
+    {
+        try
+        {
+            while (true)
+            {
+                Task? processingTask;
+
+                lock (_sync)
+                {
+                    if (_hasFailed)
+                        break;
+
+                    processingTask =
+                        _processingCompletion?.Task;
+                }
+
+                if (processingTask is not null)
+                {
+                    await processingTask.ConfigureAwait(false);
+                }
+
+                await ProcessPendingAsync(
+                    CancellationToken.None).ConfigureAwait(false);
+
+                lock (_sync)
+                {
+                    if (_hasFailed)
+                        break;
+
+                    if (!_isProcessing &&
+                        _pendingChunks.Count == 0)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            Exception? processingFailure;
+
+            lock (_sync)
+            {
+                processingFailure = _failureException;
+            }
+
+            if (processingFailure is not null)
+            {
+                throw new InvalidOperationException(
+                    "The stream failed during processing.",
+                    processingFailure);
+            }
+
+            MarkdownUpdate update;
+
+            try
+            {
+                update = _processor.Complete();
+            }
+            catch (Exception exception)
+            {
+                RecordFailure(exception);
+
+                try
+                {
+                    update = _processor.Fail(exception);
+                    PublishUpdate(update);
+                }
+                catch (Exception failureException)
+                {
+                    throw new InvalidOperationException(
+                        "Stream completion failed, and the processor could not create an error update.",
+                        new AggregateException(exception, failureException));
+                }
+
+                throw new InvalidOperationException(
+                    "The stream failed while completing.",
+                    exception);
+            }
+
+            PublishUpdate(update);
+        }
+        finally
+        {
+            _workerCancellation?.Cancel();
+
+            await StopWorkerAsync().ConfigureAwait(false);
+        }
+    }
+
+    private async Task CancelCoreAsync()
+    {
+        try
+        {
+            Task? processingTask;
+
+            lock (_sync)
+            {
+                _isCompleting = true;
+                _pendingChunks.Clear();
+
+                _workerCancellation?.Cancel();
+
+                processingTask =
+                    _processingCompletion?.Task;
+            }
+
+            if (processingTask is not null)
+            {
+                await processingTask.ConfigureAwait(false);
+            }
+
+            bool hasFailed;
+
+            lock (_sync)
+            {
+                hasFailed = _hasFailed;
+            }
+
+            if (!hasFailed)
+            {
+                var update = _processor.Cancel();
+                PublishUpdate(update);
+            }
+        }
+        finally
+        {
+            _workerCancellation?.Cancel();
+
+            await StopWorkerAsync().ConfigureAwait(false);
+        }
+    }
+
+    private void PublishUpdate(MarkdownUpdate update)
+    {
+        var handlers = UpdateAvailable;
+
+        if (handlers is null)
+            return;
+
+        foreach (Action<MarkdownUpdate> handler
+            in handlers.GetInvocationList())
         {
             try
             {
-                await workerTask;
+                handler(update);
             }
-            catch (OperationCanceledException)
+            catch (Exception exception)
             {
-                // Expected during shutdown.
+                System.Diagnostics.Debug.WriteLine(
+                    $"Markdown update subscriber failed: {exception}");
             }
         }
+    }
+    public static MarkdownStreamScheduler Create()
+    {
+        var buffer = new MarkdownBuffer();
+        var parser = new MarkdigMarkdownParser();
+        var reconciler = new DocumentReconciler();
+        var diffEngine = new DocumentDiffEngine();
 
-        lock (_sync)
-        {
-            if (ReferenceEquals(
-                _workerTask,
-                workerTask))
-            {
-                _workerTask = null;
+        var processor = new MarkdownStreamProcessor(
+            buffer,
+            parser,
+            reconciler,
+            diffEngine);
 
-                _workerCancellation?.Dispose();
-
-                _workerCancellation = null;
-            }
-        }
+        return new MarkdownStreamScheduler(processor);
     }
 }

@@ -310,7 +310,7 @@ var markdown =
     var interval =
         TimeSpan.FromMilliseconds(
             1000.0 / chunksPerSecond);
-
+#if DEBUG
     Debug.WriteLine(
         $"[LoadTest] MarkdownLength={markdown.Length}");
 
@@ -322,7 +322,7 @@ var markdown =
 
     Debug.WriteLine(
         $"[LoadTest] TargetRate={chunksPerSecond} chunks/sec");
-
+#endif
     // --------------------------------------------------
     // Start timing
     // --------------------------------------------------
@@ -364,7 +364,7 @@ var markdown =
         measuredUiTime =
             totalUiTime;
     }
-
+#if DEBUG
     Debug.WriteLine(
         $"[LoadTest] Duration=" +
         $"{stopwatch.Elapsed.TotalSeconds:F2} sec");
@@ -407,6 +407,7 @@ var markdown =
     Debug.WriteLine(
         $"[LoadTest] ProcessedChunks=" +
         $"{scheduler.ProcessedChunkCount}");
+#endif
 }
 
 }

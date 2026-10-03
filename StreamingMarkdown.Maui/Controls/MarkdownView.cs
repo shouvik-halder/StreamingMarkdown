@@ -5,6 +5,8 @@ using StreamingMarkdown.Core.Models.Blocks;
 using StreamingMarkdown.Core.Results;
 using StreamingMarkdown.Maui.Rendering;
 using StreamingMarkdown.Maui.Styling;
+using Microsoft.Maui.ApplicationModel;
+using StreamingMarkdown.Maui.Streaming;
 
 namespace StreamingMarkdown.Maui.Controls;
 
@@ -32,6 +34,22 @@ public sealed class MarkdownView : ContentView
             null,
             propertyChanged:
                 OnStyleChanged);
+    
+    public static readonly BindableProperty SourceProperty =
+    BindableProperty.Create(
+        nameof(Source),
+        typeof(IMarkdownStreamSession),
+        typeof(MarkdownView),
+        default(IMarkdownStreamSession),
+        propertyChanged: OnSourceChanged);
+
+public IMarkdownStreamSession? Source
+{
+    get => (IMarkdownStreamSession?)GetValue(SourceProperty);
+    set => SetValue(SourceProperty, value);
+}
+
+private Action<MarkdownUpdate>? _sourceUpdateHandler;
 
     public MarkdownDocument Document
     {
@@ -45,6 +63,65 @@ public sealed class MarkdownView : ContentView
                 value);
     }
 
+private static void OnSourceChanged(
+    BindableObject bindable,
+    object oldValue,
+    object newValue)
+{
+    var view = (MarkdownView)bindable;
+
+    if (oldValue is IMarkdownStreamSession oldSession &&
+        view._sourceUpdateHandler is not null)
+    {
+        oldSession.UpdateAvailable -= view._sourceUpdateHandler;
+    }
+
+    view._sourceUpdateHandler = null;
+
+    // Clear content from the previously recycled message.
+    view.Document = MarkdownDocument.Empty;
+
+    if (newValue is not IMarkdownStreamSession newSession)
+        return;
+
+    Action<MarkdownUpdate> handler = update =>
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            // Ignore updates belonging to another recycled cell.
+            if (!ReferenceEquals(view.Source, newSession))
+                return;
+
+            view.ApplyUpdate(update);
+        });
+    };
+
+    view._sourceUpdateHandler = handler;
+    newSession.UpdateAvailable += handler;
+
+    // Rehydrate a recycled MarkdownView from the
+    // session's latest known document.
+    var latestUpdate = newSession.LatestUpdate;
+
+if (latestUpdate is not null)
+{
+    // Prevent the Document property callback from
+    // rendering the document a second time.
+    view._isApplyingUpdate = true;
+
+    try
+    {
+        view.Document = latestUpdate.Document;
+    }
+    finally
+    {
+        view._isApplyingUpdate = false;
+    }
+
+    view.RenderDocument(latestUpdate.Document);
+}
+}
+    
     public new MarkdownStyle? Style
     {
         get =>
@@ -268,7 +345,7 @@ public sealed class MarkdownView : ContentView
             _isApplyingUpdate = false;
 
             totalStopwatch.Stop();
-
+#if DEBUG
             Debug.WriteLine(
                 $"[MarkdownView] ApplyUpdate " +
                 $"Total={totalStopwatch.Elapsed.TotalMilliseconds:F2} ms, " +
@@ -280,6 +357,7 @@ public sealed class MarkdownView : ContentView
                 $"({removedTime.TotalMilliseconds:F2} ms), " +
                 $"Reorder={reorderPerformed} " +
                 $"({reorderTime.TotalMilliseconds:F2} ms)");
+#endif
         }
     }
 
@@ -331,7 +409,7 @@ public sealed class MarkdownView : ContentView
         layoutStopwatch.Stop();
 
         totalStopwatch.Stop();
-
+#if DEBUG
         Debug.WriteLine(
             $"[MarkdownView] ApplyAdded " +
             $"BlockType={change.Current.GetType().Name}, " +
@@ -339,6 +417,7 @@ public sealed class MarkdownView : ContentView
             $"State={stateStopwatch.Elapsed.TotalMilliseconds:F2} ms, " +
             $"LayoutAdd={layoutStopwatch.Elapsed.TotalMilliseconds:F2} ms, " +
             $"Total={totalStopwatch.Elapsed.TotalMilliseconds:F2} ms");
+#endif
     }
 
     private bool IsAppendOnlyAddition(
@@ -366,7 +445,7 @@ public sealed class MarkdownView : ContentView
         }
 
         _layout.Children.Remove(
-            blockView.View);
+            blockView?.View);
 
         _state.RemoveView(
             change.Previous.Id);
@@ -395,7 +474,7 @@ public sealed class MarkdownView : ContentView
             return;
         }
 
-        blockView.Update(
+        blockView?.Update(
             change.Current);
     }
 
@@ -451,11 +530,12 @@ public sealed class MarkdownView : ContentView
 
             moves++;
         }
-
+#if DEBUG
         Debug.WriteLine(
             $"[MarkdownView] ReorderViews " +
             $"Blocks={document.Blocks.Count}, " +
             $"IndexLookups={indexLookups}, " +
             $"Moves={moves}");
+#endif
     }
 }

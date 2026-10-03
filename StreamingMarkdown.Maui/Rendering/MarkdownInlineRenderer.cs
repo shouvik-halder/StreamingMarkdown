@@ -68,16 +68,19 @@ public sealed class MarkdownInlineRenderer
         }
     }
 
-    private static void AppendText(
+    private void AppendText(
         FormattedString formattedString,
         string text)
     {
         formattedString.Spans.Add(
             new Span
             {
-                Text = text
+                Text = text,
+                FontFamily = _style.FontFamily,
+                TextColor = _style.TextColor
             });
     }
+
 
     private void AppendChildren(
         FormattedString formattedString,
@@ -114,6 +117,8 @@ public sealed class MarkdownInlineRenderer
             new Span
             {
                 Text = text,
+                FontFamily = _style.FontFamily,
+                TextColor = _style.TextColor,
                 TextDecorations = TextDecorations.Underline
             };
 

@@ -22,4 +22,11 @@
     <ProjectReference Include="..\StreamingMarkdown.Core\StreamingMarkdown.Core.csproj" />
   </ItemGroup>
 
+<ItemGroup>
+  <Compile Include="../StreamingMarkdown.Maui/Streaming/MarkdownStreamSession.cs"
+           Link="Streaming/MarkdownStreamSession.cs" />
+  <Compile Include="../StreamingMarkdown.Maui/Streaming/IMarkdownStreamSession.cs"
+           Link="Streaming/IMarkdownStreamSession.cs" />
+</ItemGroup>
+
 </Project>

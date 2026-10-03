@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:markdown="clr-namespace:StreamingMarkdown.Maui.Controls;assembly=StreamingMarkdown.Maui"
+    x:Class="StreamingMarkdown.Maui.TestApp.Views.StreamingMarkdownTestPage"
+    Title="Streaming Markdown Test">
+
+    <Grid Padding="16"
+          RowDefinitions="Auto,Auto,*,Auto"
+          RowSpacing="12">
+
+        <Label
+            Grid.Row="0"
+            Text="Streaming Markdown Test Harness"
+            FontSize="22"
+            FontAttributes="Bold" />
+
+        <HorizontalStackLayout
+            Grid.Row="1"
+            Spacing="8">
+
+            <Button
+                Text="Start Stream"
+                Command="{Binding StartCommand}" />
+
+            <Button
+                Text="Cancel"
+                Command="{Binding CancelCommand}" />
+
+        </HorizontalStackLayout>
+
+        <ScrollView Grid.Row="2">
+            <markdown:MarkdownView
+                Source="{Binding MarkdownSession}" />
+        </ScrollView>
+
+        <Label
+            Grid.Row="3"
+            Text="{Binding Status}"
+            FontSize="12"
+            TextColor="Gray" />
+
+    </Grid>
+</ContentPage>

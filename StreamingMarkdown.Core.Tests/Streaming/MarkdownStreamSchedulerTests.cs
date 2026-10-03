@@ -717,6 +717,221 @@ public async Task Append_DoesNotBlockWhileProcessing()
     scheduler.Reset();
 }
 
+
+[Fact]
+public async Task ConcurrentCompleteAsync_CompletesOnlyOnce()
+{
+    var parser = new BlockingMarkdownParser();
+    var scheduler = new MarkdownStreamScheduler(
+        CreateProcessor(parser));
+
+    var completedUpdateCount = 0;
+
+    scheduler.UpdateAvailable += update =>
+    {
+        if (update.IsCompleted)
+        {
+            Interlocked.Increment(ref completedUpdateCount);
+        }
+    };
+
+    scheduler.Begin();
+    scheduler.Append("Hello");
+
+    await parser.ProcessingStarted.Task;
+
+    var first = scheduler.CompleteAsync();
+    var second = scheduler.CompleteAsync();
+
+    try
+    {
+        parser.ReleaseProcessing();
+
+        await Task.WhenAll(first, second);
+
+        Assert.Equal(1, completedUpdateCount);
+    }
+    finally
+    {
+        parser.ReleaseProcessing();
+    }
+
+    scheduler.Reset();
+}
+
+[Fact]
+public async Task ConcurrentCancelAsync_CancelsOnlyOnce()
+{
+    var scheduler = new MarkdownStreamScheduler(
+        CreateProcessor());
+
+    var cancelledUpdateCount = 0;
+
+    scheduler.UpdateAvailable += update =>
+    {
+        if (update.Result == MarkdownStreamResult.Cancelled)
+        {
+            Interlocked.Increment(ref cancelledUpdateCount);
+        }
+    };
+
+    scheduler.Begin();
+
+    await Task.WhenAll(
+        scheduler.CancelAsync(),
+        scheduler.CancelAsync());
+
+    Assert.Equal(1, cancelledUpdateCount);
+
+    scheduler.Reset();
+}
+
+[Fact]
+public async Task CompleteAsync_CallerCancellationDoesNotAbortCleanup()
+{
+    var parser = new BlockingMarkdownParser();
+    var scheduler = new MarkdownStreamScheduler(
+        CreateProcessor(parser));
+
+    scheduler.Begin();
+    scheduler.Append("Hello");
+
+    await parser.ProcessingStarted.Task;
+
+    using var cts = new CancellationTokenSource();
+
+    var completionTask = scheduler.CompleteAsync(cts.Token);
+
+    try
+    {
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await completionTask);
+
+        parser.ReleaseProcessing();
+
+        // Wait for the original internal operation to finish.
+        await scheduler.CompleteAsync();
+
+        Assert.True(parser.CompletedAfterProcessing);
+    }
+    finally
+    {
+        parser.ReleaseProcessing();
+    }
+
+    scheduler.Reset();
+}
+
+[Fact]
+public async Task Reset_DuringCompletion_Throws()
+{
+    var parser = new BlockingMarkdownParser();
+    var scheduler = new MarkdownStreamScheduler(
+        CreateProcessor(parser));
+
+    scheduler.Begin();
+    scheduler.Append("Hello");
+
+    await parser.ProcessingStarted.Task;
+
+    var completionTask = scheduler.CompleteAsync();
+
+    try
+    {
+        Assert.Throws<InvalidOperationException>(
+            () => scheduler.Reset());
+
+        parser.ReleaseProcessing();
+
+        await completionTask;
+    }
+    finally
+    {
+        parser.ReleaseProcessing();
+    }
+
+    scheduler.Reset();
+}
+
+[Fact]
+public async Task UpdateAvailable_ThrowingSubscriberDoesNotBlockOthers()
+{
+    var scheduler = new MarkdownStreamScheduler(
+        CreateProcessor());
+
+    var receivedUpdateCount = 0;
+
+    scheduler.UpdateAvailable += _ =>
+    {
+        throw new InvalidOperationException(
+            "Intentional subscriber failure.");
+    };
+
+    scheduler.UpdateAvailable += _ =>
+    {
+        Interlocked.Increment(ref receivedUpdateCount);
+    };
+
+    scheduler.Begin();
+    scheduler.Append("Hello");
+
+    await scheduler.CompleteAsync();
+
+    Assert.True(receivedUpdateCount > 0);
+
+    scheduler.Reset();
+}
+
+[Fact]
+public async Task CancelAsync_DuringProcessing_WaitsForProcessingAndCleansUp()
+{
+    var parser = new BlockingMarkdownParser();
+    var scheduler = new MarkdownStreamScheduler(
+        CreateProcessor(parser));
+
+    var cancelledUpdateCount = 0;
+
+    scheduler.UpdateAvailable += update =>
+    {
+        if (update.Result == MarkdownStreamResult.Cancelled)
+        {
+            Interlocked.Increment(ref cancelledUpdateCount);
+        }
+    };
+
+    scheduler.Begin();
+    scheduler.Append("Hello");
+
+    await parser.ProcessingStarted.Task;
+
+    var cancellationTask = scheduler.CancelAsync();
+
+    try
+    {
+        Assert.False(cancellationTask.IsCompleted);
+
+        parser.ReleaseProcessing();
+
+        await cancellationTask;
+
+        Assert.Equal(1, cancelledUpdateCount);
+    }
+    finally
+    {
+        parser.ReleaseProcessing();
+    }
+
+    scheduler.Reset();
+
+    // The scheduler should be reusable after cancellation.
+    scheduler.Begin();
+    await scheduler.CompleteAsync();
+    scheduler.Reset();
+}
+
+
     private static MarkdownStreamProcessor CreateProcessor(
         IMarkdownParser? parser = null)
     {

@@ -97,7 +97,8 @@ internal sealed class ListView : IMarkdownBlockView
             formattedText.Spans.Add(
                 new Span
                 {
-                    Text = prefix
+                    Text = prefix,
+                    TextColor =_style.TextColor
                 });
 
             var content =

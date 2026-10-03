@@ -79,8 +79,25 @@ public MarkdownUpdate Append(string chunk)
             _context.Version);
     }
 
+    var totalStopwatch =
+        System.Diagnostics.Stopwatch.StartNew();
+
+    var previousBlockCount =
+        _context.Document.Blocks.Count;
+
+    // --------------------------------------------------
+    // 1. Append
+    // --------------------------------------------------
+    var appendStopwatch =
+        System.Diagnostics.Stopwatch.StartNew();
+
     _buffer.Append(chunk);
 
+    appendStopwatch.Stop();
+
+    // --------------------------------------------------
+    // 2. Parse
+    // --------------------------------------------------
     var reparseStart =
         _context.Document.Blocks.Count > 0
             ? _context.Document.Blocks[^1].SourceStart
@@ -89,11 +106,22 @@ public MarkdownUpdate Append(string chunk)
     var suffix =
         _buffer.GetSuffix(reparseStart);
 
+    var parseStopwatch =
+        System.Diagnostics.Stopwatch.StartNew();
+
     var parseResult =
         _incrementalParser.ParseSuffix(
             suffix,
             _context.Document,
             reparseStart);
+
+    parseStopwatch.Stop();
+
+    // --------------------------------------------------
+    // 3. Reconcile
+    // --------------------------------------------------
+    var reconcileStopwatch =
+        System.Diagnostics.Stopwatch.StartNew();
 
     var reconciledDocument =
         _reconciler.ReconcileIncremental(
@@ -101,16 +129,51 @@ public MarkdownUpdate Append(string chunk)
             parseResult.Document,
             parseResult.ReusedBlockCount);
 
+    reconcileStopwatch.Stop();
+
+    // --------------------------------------------------
+    // 4. Diff
+    // --------------------------------------------------
+    var diffStopwatch =
+        System.Diagnostics.Stopwatch.StartNew();
+
     var diff =
         _diffEngine.CompareIncremental(
             _context.Document,
             reconciledDocument,
             parseResult.ReusedBlockCount);
 
+    diffStopwatch.Stop();
+
+    // --------------------------------------------------
+    // 5. Update context
+    // --------------------------------------------------
     _context.Document =
         reconciledDocument;
 
     _context.Version++;
+
+    totalStopwatch.Stop();
+
+    // --------------------------------------------------
+    // Diagnostics
+    // --------------------------------------------------
+    System.Diagnostics.Debug.WriteLine(
+        $"[MarkdownProcessor] " +
+        $"Version={_context.Version} | " +
+        $"ChunkChars={chunk.Length} | " +
+        $"BufferChars={_buffer.Content.Length} | " +
+        $"PreviousBlocks={previousBlockCount} | " +
+        $"CurrentBlocks={reconciledDocument.Blocks.Count} | " +
+        $"ReparseStart={reparseStart} | " +
+        $"SuffixChars={suffix.Length} | " +
+        $"ReusedBlocks={parseResult.ReusedBlockCount} | " +
+        $"DiffChanges={diff.Changes.Count} | " +
+        $"Append={appendStopwatch.Elapsed.TotalMilliseconds:F3} ms | " +
+        $"Parse={parseStopwatch.Elapsed.TotalMilliseconds:F3} ms | " +
+        $"Reconcile={reconcileStopwatch.Elapsed.TotalMilliseconds:F3} ms | " +
+        $"Diff={diffStopwatch.Elapsed.TotalMilliseconds:F3} ms | " +
+        $"Total={totalStopwatch.Elapsed.TotalMilliseconds:F3} ms");
 
     return new MarkdownUpdate(
         reconciledDocument,
@@ -118,7 +181,8 @@ public MarkdownUpdate Append(string chunk)
         MarkdownStreamResult.Streaming,
         _context.Version);
 }
-    public MarkdownUpdate Complete()
+
+   public MarkdownUpdate Complete()
     {
         EnsureStreaming();
 

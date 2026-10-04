@@ -3,6 +3,7 @@ using StreamingMarkdown.Maui.Styling;
 
 namespace StreamingMarkdown.Maui.Rendering.Views;
 
+
 internal sealed class ParagraphView : IMarkdownBlockView
 {
     private readonly Label _label;
@@ -10,55 +11,38 @@ internal sealed class ParagraphView : IMarkdownBlockView
     private readonly MarkdownStyle _style;
 
     public Guid BlockId { get; private set; }
-
     public View View => _label;
 
     public ParagraphView(
         ParagraphBlock block,
-        MarkdownStyle? style = null)
+        MarkdownStyle? style = null,
+        IMarkdownFontResolver? fontResolver = null)
     {
         ArgumentNullException.ThrowIfNull(block);
 
-        _style =
-            style ?? new MarkdownStyle();
-
-        _inlineRenderer =
-            new MarkdownInlineRenderer(
-                _style);
+        _style = style ?? new MarkdownStyle();
+        _inlineRenderer = new MarkdownInlineRenderer(_style, fontResolver);
 
         _label = new Label
         {
+            FontFamily = _style.FontFamily,
             FontSize = _style.BodyFontSize,
             LineHeight = _style.LineHeight,
             LineBreakMode = LineBreakMode.WordWrap,
-            Margin = new Thickness(
-        0, 0, 0, _style.BlockSpacing),
+            Margin = new Thickness(0, 0, 0, _style.BlockSpacing),
             TextColor = _style.TextColor
         };
-
-        if (!string.IsNullOrWhiteSpace(_style.FontFamily))
-        {
-            _label.FontFamily = _style.FontFamily;
-        }
 
         Update(block);
     }
 
-    public void Update(
-        MarkdownBlock block)
+    public void Update(MarkdownBlock block)
     {
         if (block is not ParagraphBlock paragraph)
-        {
             throw new ArgumentException(
-                "Block must be a ParagraphBlock.",
-                nameof(block));
-        }
+                "Block must be a ParagraphBlock.", nameof(block));
 
-        BlockId =
-            paragraph.Id;
-
-        _label.FormattedText =
-            _inlineRenderer.Render(
-                paragraph.Inlines);
+        BlockId = paragraph.Id;
+        _label.FormattedText = _inlineRenderer.Render(paragraph.Inlines);
     }
 }

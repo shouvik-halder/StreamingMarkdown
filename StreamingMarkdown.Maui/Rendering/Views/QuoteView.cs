@@ -1,3 +1,4 @@
+
 using StreamingMarkdown.Core.Models.Blocks;
 using StreamingMarkdown.Maui.Styling;
 
@@ -15,23 +16,20 @@ internal sealed class QuoteView : IMarkdownBlockView
 
     public QuoteView(
         QuoteBlock block,
-        MarkdownStyle? style = null)
+        MarkdownStyle? style = null,
+        IMarkdownFontResolver? fontResolver = null)
     {
         ArgumentNullException.ThrowIfNull(block);
 
         _style = style ?? new MarkdownStyle();
 
         _inlineRenderer =
-            new MarkdownInlineRenderer(_style);
+            new MarkdownInlineRenderer(_style, fontResolver);
 
         _layout = new VerticalStackLayout
         {
             Spacing = 4,
-            Padding = new Thickness(
-                12,
-                4,
-                8,
-                4),
+            Padding = new Thickness(12, 4, 8, 4),
             Margin = new Thickness(
                 _style.QuoteIndent,
                 0,
@@ -52,25 +50,22 @@ internal sealed class QuoteView : IMarkdownBlockView
         }
 
         BlockId = quote.Id;
-
         _layout.Children.Clear();
 
         foreach (var childBlock in quote.Blocks)
         {
             if (childBlock is not ParagraphBlock paragraph)
-            {
                 continue;
-            }
 
             var label = new Label
             {
-                LineBreakMode =
-                    LineBreakMode.WordWrap,
+                FontFamily = _style.FontFamily,
+                FontSize = _style.BodyFontSize,
+                LineBreakMode = LineBreakMode.WordWrap,
                 LineHeight = _style.LineHeight,
                 TextColor = _style.TextColor,
                 FormattedText =
-                    _inlineRenderer.Render(
-                        paragraph.Inlines)
+                    _inlineRenderer.Render(paragraph.Inlines)
             };
 
             _layout.Children.Add(label);

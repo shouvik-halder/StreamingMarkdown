@@ -1,3 +1,4 @@
+
 using StreamingMarkdown.Core.Models;
 using StreamingMarkdown.Core.Models.Blocks;
 using StreamingMarkdown.Maui.Configuration;
@@ -10,49 +11,49 @@ public sealed class MarkdownDocumentRenderer
 {
     private readonly MarkdownBlockRenderer _blockRenderer;
 
-    public MarkdownDocumentRenderer(
+    
+public MarkdownDocumentRenderer(
     StreamingMarkdownOptions options,
-    MarkdownStyle? style = null)
+    MarkdownStyle? style = null,
+    IMarkdownFontResolver? fontResolver = null)
 {
-    var resolvedStyle =
-        MarkdownStyleResolver.Resolve(options, style);
+    ArgumentNullException.ThrowIfNull(options);
 
-    _blockRenderer =
-        new MarkdownBlockRenderer(resolvedStyle);
+    var resolvedStyle = MarkdownStyleResolver.Resolve(options, style);
+
+    fontResolver ??= new MarkdownFontResolver(options.FontFaces);
+
+    _blockRenderer = new MarkdownBlockRenderer(
+        resolvedStyle,
+        fontResolver);
 }
 
-    public View Render(
-        MarkdownDocument document)
+    public View Render(MarkdownDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
 
-        var layout =
-            new VerticalStackLayout
-            {
-                Spacing = 0
-            };
+        var layout = new VerticalStackLayout
+        {
+            Spacing = 0
+        };
 
         foreach (var block in document.Blocks)
         {
-            var blockView =
-                RenderBlock(block);
+            var blockView = RenderBlock(block);
 
             if (blockView is not null)
             {
-                layout.Children.Add(
-                    blockView.View);
+                layout.Children.Add(blockView.View);
             }
         }
 
         return layout;
     }
 
-    internal IMarkdownBlockView? RenderBlock(
-        MarkdownBlock block)
+    internal IMarkdownBlockView? RenderBlock(MarkdownBlock block)
     {
         ArgumentNullException.ThrowIfNull(block);
 
-        return _blockRenderer.Render(
-            block);
+        return _blockRenderer.Render(block);
     }
 }

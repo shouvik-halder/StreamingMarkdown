@@ -5,6 +5,7 @@ using StreamingMarkdown.Maui.TestApp.Features.Chat.ViewModels;
 using StreamingMarkdown.Maui.TestApp.Features.Chat.Views;
 using StreamingMarkdown.Maui.TestApp.ViewModels;
 using StreamingMarkdown.Maui.TestApp.Views;
+using StreamingMarkdown.Maui.Styling;
 
 namespace StreamingMarkdown.Maui.TestApp;
 
@@ -18,18 +19,24 @@ public static class MauiProgram
 			.UseMauiApp<App>()
 			.ConfigureFonts(fonts =>
 			{
-#if IOS || MACCATALYST
-#else
 				fonts.AddFont("Roboto-Bold.ttf", "RobotoBold");
 				fonts.AddFont("Roboto-Italic.ttf", "RobotoItalic");
 				fonts.AddFont("Roboto-Light.ttf", "RobotoLight");
 				fonts.AddFont("Roboto-Medium.ttf", "RobotoMedium");
 				fonts.AddFont("Roboto-Regular.ttf", "RobotoRegular");
 				fonts.AddFont("Roboto-SemiBold.ttf", "RobotoSemiBold");
-#endif
+				fonts.AddFont("Roboto-BoldItalic.ttf", "RobotoBoldItalic");
 			})
 			.UseStreamingMarkdown(options =>
 			{
+				options.FontFamily="RobotoRegular";
+				options.FontFaces= new MarkdownFontFamilySet
+				{
+					Regular="RobotoRegular",
+					Bold="RobotoBold",
+					Italic="RobotoItalic",
+					BoldItalic="RobotoBoldItalic",
+				};
 				options.LineHeight = 1;
 			});
 

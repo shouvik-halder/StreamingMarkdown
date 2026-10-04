@@ -68,7 +68,7 @@ public partial class ChatPage : ContentPage
             {
                 Text = reply.Text,
                 Command = vm.SuggestedReplyCommand,
-                CommandParameter = reply,
+                CommandParameter = reply, FontFamily="RobotoSemiBold",
                 BackgroundColor = Colors.White,
                 BorderColor = Color.FromArgb("#006BD3"),
                 BorderWidth = 1,

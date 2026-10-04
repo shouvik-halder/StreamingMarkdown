@@ -1,8 +1,12 @@
+using StreamingMarkdown.Maui.Styling;
+
 namespace StreamingMarkdown.Maui.Configuration;
 
 public sealed class StreamingMarkdownOptions
 {
     public string? FontFamily { get; set; }
+
+    public MarkdownFontFamilySet? FontFaces { get; set; }
 
     public Color? TextColor { get; set; }
 

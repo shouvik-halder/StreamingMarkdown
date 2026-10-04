@@ -84,7 +84,9 @@ internal sealed class ListView : IMarkdownBlockView
             var label = new Label
             {
                 LineBreakMode =
-                    LineBreakMode.WordWrap
+                    LineBreakMode.WordWrap,
+                TextColor =_style.TextColor,
+                LineHeight = _style.LineHeight
             };
 
             var formattedText =
@@ -98,7 +100,8 @@ internal sealed class ListView : IMarkdownBlockView
                 new Span
                 {
                     Text = prefix,
-                    TextColor =_style.TextColor
+                    TextColor =_style.TextColor,
+                    LineHeight = _style.LineHeight
                 });
 
             var content =

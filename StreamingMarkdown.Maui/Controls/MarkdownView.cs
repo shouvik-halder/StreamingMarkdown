@@ -7,6 +7,7 @@ using StreamingMarkdown.Maui.Rendering;
 using StreamingMarkdown.Maui.Styling;
 using Microsoft.Maui.ApplicationModel;
 using StreamingMarkdown.Maui.Streaming;
+using StreamingMarkdown.Maui.Configuration;
 
 namespace StreamingMarkdown.Maui.Controls;
 
@@ -15,6 +16,7 @@ public sealed class MarkdownView : ContentView
     private readonly VerticalStackLayout _layout;
     private readonly MarkdownViewState _state;
 
+    private readonly StreamingMarkdownOptions _options;
     private bool _isApplyingUpdate;
 
     public static readonly BindableProperty DocumentProperty =
@@ -26,14 +28,13 @@ public sealed class MarkdownView : ContentView
             propertyChanged:
                 OnDocumentChanged);
 
-    public static new readonly BindableProperty StyleProperty =
-        BindableProperty.Create(
-            nameof(Style),
-            typeof(MarkdownStyle),
-            typeof(MarkdownView),
-            null,
-            propertyChanged:
-                OnStyleChanged);
+    public static readonly BindableProperty MarkdownStyleProperty =
+    BindableProperty.Create(
+        nameof(MarkdownStyle),
+        typeof(MarkdownStyle),
+        typeof(MarkdownView),
+        defaultValue: null,
+        propertyChanged: OnMarkdownStyleChanged);
     
     public static readonly BindableProperty SourceProperty =
     BindableProperty.Create(
@@ -122,31 +123,24 @@ if (latestUpdate is not null)
 }
 }
     
-    public new MarkdownStyle? Style
-    {
-        get =>
-            (MarkdownStyle?)GetValue(
-                StyleProperty);
-
-        set =>
-            SetValue(
-                StyleProperty,
-                value);
-    }
+    public MarkdownStyle? MarkdownStyle
+{
+    get => (MarkdownStyle?)GetValue(MarkdownStyleProperty);
+    set => SetValue(MarkdownStyleProperty, value);
+}
 
     public MarkdownView()
-    {
-        _layout =
-            new VerticalStackLayout
-            {
-                Spacing = 0
-            };
+{
+    _options =
+        Application.Current?.Handler?.MauiContext?.Services
+            .GetService<StreamingMarkdownOptions>()
+        ?? new StreamingMarkdownOptions();
 
-        _state =
-            new MarkdownViewState();
+    _layout = new VerticalStackLayout { Spacing = 0 };
+    _state = new MarkdownViewState();
 
-        Content = _layout;
-    }
+    Content = _layout;
+}
 
     private static void OnDocumentChanged(
         BindableObject bindable,
@@ -165,17 +159,15 @@ if (latestUpdate is not null)
             (MarkdownDocument)newValue);
     }
 
-    private static void OnStyleChanged(
-        BindableObject bindable,
-        object oldValue,
-        object newValue)
-    {
-        var view =
-            (MarkdownView)bindable;
+    private static void OnMarkdownStyleChanged(
+    BindableObject bindable,
+    object oldValue,
+    object newValue)
+{
+    var view = (MarkdownView)bindable;
 
-        view.RenderDocument(
-            view.Document);
-    }
+    view.RenderDocument(view.Document);
+}
 
     private void RenderDocument(
         MarkdownDocument document)
@@ -184,9 +176,7 @@ if (latestUpdate is not null)
 
         _state.Clear();
 
-        var renderer =
-            new MarkdownDocumentRenderer(
-                Style);
+        var renderer = new MarkdownDocumentRenderer(_options, MarkdownStyle);
 
         foreach (var block in document.Blocks)
         {
@@ -247,9 +237,7 @@ if (latestUpdate is not null)
                 return;
             }
 
-            var renderer =
-                new MarkdownDocumentRenderer(
-                    Style);
+            var renderer = new MarkdownDocumentRenderer(_options, MarkdownStyle);
 
             foreach (var change in update.Diff.Changes)
             {
@@ -463,9 +451,7 @@ if (latestUpdate is not null)
                 change.Current.Id,
                 out var blockView))
         {
-            var renderer =
-                new MarkdownDocumentRenderer(
-                    Style);
+            var renderer = new MarkdownDocumentRenderer(_options, MarkdownStyle);
 
             ApplyAdded(
                 change,

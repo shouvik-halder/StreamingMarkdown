@@ -18,14 +18,19 @@ public static class MauiProgram
 			.UseMauiApp<App>()
 			.ConfigureFonts(fonts =>
 			{
-				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+#if IOS || MACCATALYST
+#else
+				fonts.AddFont("Roboto-Bold.ttf", "RobotoBold");
+				fonts.AddFont("Roboto-Italic.ttf", "RobotoItalic");
+				fonts.AddFont("Roboto-Light.ttf", "RobotoLight");
+				fonts.AddFont("Roboto-Medium.ttf", "RobotoMedium");
+				fonts.AddFont("Roboto-Regular.ttf", "RobotoRegular");
+				fonts.AddFont("Roboto-SemiBold.ttf", "RobotoSemiBold");
+#endif
 			})
 			.UseStreamingMarkdown(options =>
 			{
-				options.FontFamily = "OpenSansRegular";
-				options.FontSize = 14;
-				options.HeadingFontSize = 20;
+				options.LineHeight = 1;
 			});
 
 		builder.Services.AddTransient<StreamingMarkdownTestPage>();

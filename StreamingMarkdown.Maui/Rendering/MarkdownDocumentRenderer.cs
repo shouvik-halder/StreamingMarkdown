@@ -1,5 +1,6 @@
 using StreamingMarkdown.Core.Models;
 using StreamingMarkdown.Core.Models.Blocks;
+using StreamingMarkdown.Maui.Configuration;
 using StreamingMarkdown.Maui.Rendering.Views;
 using StreamingMarkdown.Maui.Styling;
 
@@ -10,12 +11,15 @@ public sealed class MarkdownDocumentRenderer
     private readonly MarkdownBlockRenderer _blockRenderer;
 
     public MarkdownDocumentRenderer(
-        MarkdownStyle? style = null)
-    {
-        _blockRenderer =
-            new MarkdownBlockRenderer(
-                style);
-    }
+    StreamingMarkdownOptions options,
+    MarkdownStyle? style = null)
+{
+    var resolvedStyle =
+        MarkdownStyleResolver.Resolve(options, style);
+
+    _blockRenderer =
+        new MarkdownBlockRenderer(resolvedStyle);
+}
 
     public View Render(
         MarkdownDocument document)

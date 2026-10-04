@@ -66,6 +66,8 @@ internal sealed class QuoteView : IMarkdownBlockView
             {
                 LineBreakMode =
                     LineBreakMode.WordWrap,
+                LineHeight = _style.LineHeight,
+                TextColor = _style.TextColor,
                 FormattedText =
                     _inlineRenderer.Render(
                         paragraph.Inlines)

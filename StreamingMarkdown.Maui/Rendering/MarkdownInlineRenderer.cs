@@ -72,39 +72,43 @@ public sealed class MarkdownInlineRenderer
         FormattedString formattedString,
         string text)
     {
-        formattedString.Spans.Add(
-            new Span
-            {
-                Text = text,
-                FontFamily = _style.FontFamily,
-                TextColor = _style.TextColor
-            });
+        var span = new Span
+        {
+            Text = text,
+            FontSize = _style.BodyFontSize,
+            TextColor = _style.TextColor,
+            LineHeight = _style.LineHeight
+        };
+
+        if (!string.IsNullOrWhiteSpace(_style.FontFamily))
+        {
+            span.FontFamily = _style.FontFamily;
+        }
+
+        formattedString.Spans.Add(span);
     }
+
 
 
     private void AppendChildren(
-        FormattedString formattedString,
-        IReadOnlyList<MarkdownInline> children,
-        FontAttributes attributes)
+    FormattedString formattedString,
+    IReadOnlyList<MarkdownInline> children,
+    FontAttributes attributes)
+{
+    var beforeCount = formattedString.Spans.Count;
+
+    foreach (var child in children)
     {
-        var beforeCount =
-            formattedString.Spans.Count;
-
-        foreach (var child in children)
-        {
-            AppendInline(
-                formattedString,
-                child);
-        }
-
-        for (var i = beforeCount;
-             i < formattedString.Spans.Count;
-             i++)
-        {
-            formattedString.Spans[i].FontAttributes =
-                attributes;
-        }
+        AppendInline(formattedString, child);
     }
+
+    for (var i = beforeCount; i < formattedString.Spans.Count; i++)
+    {
+        var span = formattedString.Spans[i];
+
+        span.FontAttributes |= attributes;
+    }
+}
 
     private void AppendLink(
         FormattedString formattedString,
@@ -113,14 +117,19 @@ public sealed class MarkdownInlineRenderer
         var text =
             ExtractText(link.Children);
 
-        var span =
-            new Span
-            {
-                Text = text,
-                FontFamily = _style.FontFamily,
-                TextColor = _style.TextColor,
-                TextDecorations = TextDecorations.Underline
-            };
+        var span = new Span
+        {
+            Text = text,
+            FontSize = _style.BodyFontSize,
+            TextColor = _style.TextColor,
+            LineHeight = _style.LineHeight,
+            TextDecorations = TextDecorations.Underline
+        };
+
+        if (!string.IsNullOrWhiteSpace(_style.FontFamily))
+        {
+            span.FontFamily = _style.FontFamily;
+        }
 
         span.GestureRecognizers.Add(
             new TapGestureRecognizer

@@ -28,6 +28,7 @@ internal sealed class HeadingView : IMarkdownBlockView
         {
             FontFamily = _style.FontFamily,
             LineBreakMode = LineBreakMode.WordWrap,
+            LineHeight = _style.LineHeight,
             Margin = new Thickness(
                 0,
                 0,

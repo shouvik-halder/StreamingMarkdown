@@ -56,17 +56,10 @@ public sealed class ChatMessageViewModel :
         set => SetProperty(ref _markdownSession, value);
     }
 
-    public ObservableCollection<SuggestedReply> SuggestedReplies { get; } = [];
-
-    // Command used by the buttons inside this message.
-    public ICommand? SuggestedReplyCommand { get; }
-
     public ChatMessageViewModel(
-        ChatMessageRole role,
-        ICommand? suggestedReplyCommand = null)
+        ChatMessageRole role)
     {
         Role = role;
-        SuggestedReplyCommand = suggestedReplyCommand;
     }
 
     private bool SetProperty<T>(

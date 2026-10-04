@@ -26,26 +26,20 @@ internal sealed class ParagraphView : IMarkdownBlockView
             new MarkdownInlineRenderer(
                 _style);
 
-        _label =
-            new Label
-            {
-                FontFamily = _style.FontFamily,
-                
-                FontSize =
-                    _style.BodyFontSize,
+        _label = new Label
+        {
+            FontSize = _style.BodyFontSize,
+            LineHeight = _style.LineHeight,
+            LineBreakMode = LineBreakMode.WordWrap,
+            Margin = new Thickness(
+        0, 0, 0, _style.BlockSpacing),
+            TextColor = _style.TextColor
+        };
 
-                LineBreakMode =
-                    LineBreakMode.WordWrap,
-
-                Margin =
-                    new Thickness(
-                        0,
-                        0,
-                        0,
-                        _style.BlockSpacing),
-                        
-                TextColor = _style.TextColor
-            };
+        if (!string.IsNullOrWhiteSpace(_style.FontFamily))
+        {
+            _label.FontFamily = _style.FontFamily;
+        }
 
         Update(block);
     }

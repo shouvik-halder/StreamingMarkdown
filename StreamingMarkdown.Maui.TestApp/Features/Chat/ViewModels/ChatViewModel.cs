@@ -22,6 +22,10 @@ public sealed class ChatViewModel :
     private string _status = "Ready";
     private string? _errorMessage;
 
+    public ObservableCollection<SuggestedReply> SuggestedReplies { get; } = [];
+
+    public bool HasSuggestedReplies => SuggestedReplies.Count > 0;
+
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public string? ErrorMessage
     {
@@ -115,28 +119,28 @@ public sealed class ChatViewModel :
             return;
 
         // Remove previous suggestions when the conversation continues.
-        foreach (var message in Messages.Where(m => m.IsAssistant))
-            message.SuggestedReplies.Clear();
+        ClearSuggestedReplies();
 
         InputText = string.Empty;
 
-        Messages.Add(new ChatMessageViewModel(
-    ChatMessageRole.User,
-    SuggestedReplyCommand)
+        var userMessage = new ChatMessageViewModel(ChatMessageRole.User)
         {
-            Text = messageText
-        });
+            Text = messageText,
+            MarkdownSession = _markdownService.CreateSession()
+        };
+
+        userMessage.MarkdownSession.Append(messageText);
+        await userMessage.MarkdownSession.CompleteAsync();
+
+        Messages.Add(userMessage);
 
         var assistantMessage =
-    new ChatMessageViewModel(
-        ChatMessageRole.Assistant,
-        SuggestedReplyCommand)
+    new ChatMessageViewModel(ChatMessageRole.Assistant)
     {
-        IsStreaming = true
+        IsStreaming = true,
+        MarkdownSession =
+                _markdownService.CreateSession()
     };
-
-        assistantMessage.MarkdownSession =
-            _markdownService.CreateSession();
 
         Messages.Add(assistantMessage);
         _activeAssistantMessage = assistantMessage;
@@ -165,7 +169,7 @@ public sealed class ChatViewModel :
 
             await assistantMessage.MarkdownSession!.CompleteAsync(token);
 
-            AddSuggestedReplies(assistantMessage, messageText);
+            AddSuggestedReplies();
 
             Status = "Response complete";
         }
@@ -211,19 +215,25 @@ public sealed class ChatViewModel :
         }
     }
 
-    private static void AddSuggestedReplies(
-        ChatMessageViewModel message,
-        string userMessage)
-    {
-        message.SuggestedReplies.Add(
-            new SuggestedReply("Show an example", "Show me an example"));
+    private void AddSuggestedReplies()
+{
+    SuggestedReplies.Clear();
 
-        message.SuggestedReplies.Add(
-            new SuggestedReply("Explain the architecture", "Explain the architecture"));
+    SuggestedReplies.Add(
+        new SuggestedReply("Show an example", "Show me an example"));
 
-        message.SuggestedReplies.Add(
-            new SuggestedReply("Ask another question", "Tell me more"));
-    }
+    SuggestedReplies.Add(
+        new SuggestedReply(
+            "Explain the architecture",
+            "Explain the architecture"));
+
+    SuggestedReplies.Add(
+        new SuggestedReply(
+            "Ask another question",
+            "Tell me more"));
+
+    OnPropertyChanged(nameof(HasSuggestedReplies));
+}
 
     private void CancelResponse()
     {
@@ -274,4 +284,13 @@ public sealed class ChatViewModel :
             }
         }
     }
+
+    private void ClearSuggestedReplies()
+{
+    if (SuggestedReplies.Count == 0)
+        return;
+
+    SuggestedReplies.Clear();
+    OnPropertyChanged(nameof(HasSuggestedReplies));
+}
 }

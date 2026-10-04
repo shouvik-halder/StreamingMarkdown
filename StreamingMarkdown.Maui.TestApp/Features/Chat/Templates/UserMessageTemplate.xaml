@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:markdown="clr-namespace:StreamingMarkdown.Maui.Controls;assembly=StreamingMarkdown.Maui"
+             xmlns:styling="clr-namespace:StreamingMarkdown.Maui.Styling;assembly=StreamingMarkdown.Maui"
+             x:Class="StreamingMarkdown.Maui.TestApp.Features.Chat.Templates.UserMessageTemplate">
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <styling:MarkdownStyle
+                x:Key="UserMarkdownStyle"
+                BodyFontSize="14"
+                TextColor="#004487"/>
+        </ResourceDictionary>
+    </ContentView.Resources>
+
+    <Border x:Name="UserMessageTemplateBorder"
+            HorizontalOptions="End"
+            Margin="16, 8"
+            StrokeThickness="0"
+            StrokeShape="RoundRectangle 14, 14, 14, 4"
+            Shadow="0 2 6 rgba(0, 107, 211, 0.25)">
+
+        <markdown:MarkdownView Margin="14, 10" MarkdownStyle="{StaticResource UserMarkdownStyle}"
+                               Source="{Binding MarkdownSession}"/>
+    </Border>
+</ContentView>

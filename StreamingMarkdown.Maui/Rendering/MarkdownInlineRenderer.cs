@@ -1,3 +1,4 @@
+
 using StreamingMarkdown.Core.Models.Inlines;
 using StreamingMarkdown.Maui.Styling;
 
@@ -7,14 +8,14 @@ public sealed class MarkdownInlineRenderer
 {
     private readonly MarkdownStyle _style;
 
-    public MarkdownInlineRenderer(
-        MarkdownStyle? style = null)
+    public MarkdownInlineRenderer(MarkdownStyle? style = null)
     {
         _style = style ?? new MarkdownStyle();
     }
 
     public FormattedString Render(
-        IReadOnlyList<MarkdownInline> inlines)
+        IReadOnlyList<MarkdownInline> inlines,
+        double? fontSize = null)
     {
         ArgumentNullException.ThrowIfNull(inlines);
 
@@ -22,9 +23,7 @@ public sealed class MarkdownInlineRenderer
 
         foreach (var inline in inlines)
         {
-            AppendInline(
-                formattedString,
-                inline);
+            AppendInline(formattedString, inline, fontSize);
         }
 
         return formattedString;
@@ -32,50 +31,101 @@ public sealed class MarkdownInlineRenderer
 
     private void AppendInline(
         FormattedString formattedString,
-        MarkdownInline inline)
+        MarkdownInline inline,
+        double? fontSize)
     {
         switch (inline)
         {
             case TextInline text:
-                AppendText(
-                    formattedString,
-                    text.Text);
-
+                AppendText(formattedString, text.Text, fontSize);
                 break;
 
             case BoldInline bold:
                 AppendChildren(
                     formattedString,
                     bold.Children,
-                    FontAttributes.Bold);
-
+                    FontAttributes.Bold,
+                    fontSize);
                 break;
 
             case ItalicInline italic:
                 AppendChildren(
                     formattedString,
                     italic.Children,
-                    FontAttributes.Italic);
-
+                    FontAttributes.Italic,
+                    fontSize);
                 break;
 
             case HyperlinkInline link:
-                AppendLink(
-                    formattedString,
-                    link);
-
+                AppendLink(formattedString, link, fontSize);
                 break;
         }
     }
 
     private void AppendText(
         FormattedString formattedString,
-        string text)
+        string text,
+        double? fontSize)
+    {
+        var span = CreateSpan(text, fontSize);
+        formattedString.Spans.Add(span);
+    }
+
+    private void AppendChildren(
+        FormattedString formattedString,
+        IReadOnlyList<MarkdownInline> children,
+        FontAttributes attributes,
+        double? fontSize)
+    {
+        var beforeCount = formattedString.Spans.Count;
+
+        foreach (var child in children)
+        {
+            AppendInline(formattedString, child, fontSize);
+        }
+
+        for (var i = beforeCount; i < formattedString.Spans.Count; i++)
+        {
+            formattedString.Spans[i].FontAttributes |= attributes;
+        }
+    }
+
+    private void AppendLink(
+        FormattedString formattedString,
+        HyperlinkInline link,
+        double? fontSize)
+    {
+        var span = CreateSpan(
+            ExtractText(link.Children),
+            fontSize);
+
+        span.TextDecorations = TextDecorations.Underline;
+
+        span.GestureRecognizers.Add(
+            new TapGestureRecognizer
+            {
+                Command = new Command(async () =>
+                {
+                    try
+                    {
+                        await Launcher.Default.OpenAsync(link.Url);
+                    }
+                    catch
+                    {
+                        // Ignore launcher failures.
+                    }
+                })
+            });
+
+        formattedString.Spans.Add(span);
+    }
+
+    private Span CreateSpan(string text, double? fontSize)
     {
         var span = new Span
         {
             Text = text,
-            FontSize = _style.BodyFontSize,
+            FontSize = fontSize ?? _style.BodyFontSize,
             TextColor = _style.TextColor,
             LineHeight = _style.LineHeight
         };
@@ -85,73 +135,7 @@ public sealed class MarkdownInlineRenderer
             span.FontFamily = _style.FontFamily;
         }
 
-        formattedString.Spans.Add(span);
-    }
-
-
-
-    private void AppendChildren(
-    FormattedString formattedString,
-    IReadOnlyList<MarkdownInline> children,
-    FontAttributes attributes)
-{
-    var beforeCount = formattedString.Spans.Count;
-
-    foreach (var child in children)
-    {
-        AppendInline(formattedString, child);
-    }
-
-    for (var i = beforeCount; i < formattedString.Spans.Count; i++)
-    {
-        var span = formattedString.Spans[i];
-
-        span.FontAttributes |= attributes;
-    }
-}
-
-    private void AppendLink(
-        FormattedString formattedString,
-        HyperlinkInline link)
-    {
-        var text =
-            ExtractText(link.Children);
-
-        var span = new Span
-        {
-            Text = text,
-            FontSize = _style.BodyFontSize,
-            TextColor = _style.TextColor,
-            LineHeight = _style.LineHeight,
-            TextDecorations = TextDecorations.Underline
-        };
-
-        if (!string.IsNullOrWhiteSpace(_style.FontFamily))
-        {
-            span.FontFamily = _style.FontFamily;
-        }
-
-        span.GestureRecognizers.Add(
-            new TapGestureRecognizer
-            {
-                Command = new Command(
-                    async () =>
-                    {
-                        try
-                        {
-                            await Launcher.Default.OpenAsync(
-                                link.Url);
-                        }
-                        catch
-                        {
-                            // Ignore launcher failures.
-                            // The renderer should not crash
-                            // because a URL cannot be opened.
-                        }
-                    })
-            });
-
-        formattedString.Spans.Add(span);
+        return span;
     }
 
     private static string ExtractText(
@@ -168,24 +152,15 @@ public sealed class MarkdownInlineRenderer
                     break;
 
                 case BoldInline bold:
-                    result.Append(
-                        ExtractText(
-                            bold.Children));
-
+                    result.Append(ExtractText(bold.Children));
                     break;
 
                 case ItalicInline italic:
-                    result.Append(
-                        ExtractText(
-                            italic.Children));
-
+                    result.Append(ExtractText(italic.Children));
                     break;
 
                 case HyperlinkInline link:
-                    result.Append(
-                        ExtractText(
-                            link.Children));
-
+                    result.Append(ExtractText(link.Children));
                     break;
             }
         }

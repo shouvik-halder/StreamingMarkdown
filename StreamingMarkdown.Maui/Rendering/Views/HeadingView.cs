@@ -34,7 +34,7 @@ internal sealed class HeadingView : IMarkdownBlockView
                 0,
                 0,
                 _style.BlockSpacing),
-            TextColor=_style.TextColor
+            TextColor = _style.TextColor
         };
 
         Update(block);
@@ -51,11 +51,12 @@ internal sealed class HeadingView : IMarkdownBlockView
 
         BlockId = heading.Id;
 
-        _label.FontSize =
-            GetFontSize(heading.Level);
+        var fontSize = GetFontSize(heading.Level);
 
-        _label.FormattedText =
-            _inlineRenderer.Render(heading.Inlines);
+        _label.FontSize = fontSize;
+        _label.FormattedText = _inlineRenderer.Render(
+            heading.Inlines,
+            fontSize);
     }
 
     private double GetFontSize(int level)

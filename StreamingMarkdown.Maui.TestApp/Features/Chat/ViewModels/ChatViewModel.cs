@@ -13,6 +13,7 @@ public sealed class ChatViewModel :
 {
     private readonly IChatService _chatService;
     private readonly IStreamingMarkdownService _markdownService;
+    private readonly IChatMessageActionService _messageActionService;
 
     private CancellationTokenSource? _responseCts;
     private ChatMessageViewModel? _activeAssistantMessage;
@@ -21,6 +22,24 @@ public sealed class ChatViewModel :
     private string _inputText = string.Empty;
     private string _status = "Ready";
     private string? _errorMessage;
+    public bool CanSend =>
+    !IsBusy &&
+    !string.IsNullOrWhiteSpace(InputText);
+
+public Color SendButtonBorderColor =>
+    CanSend
+        ? Color.FromArgb("#D9EAF9")
+        : Color.FromArgb("#EEF0F2");
+
+public Color SendButtonBackgroundColor =>
+    CanSend
+        ? Color.FromArgb("#D9EAF9")
+        : Color.FromArgb("#EEF0F2");
+
+public Color SendButtonIconColor =>
+    CanSend
+        ? Color.FromArgb("#0875E1")
+        : Color.FromArgb("#AEB5BD");
 
     public ObservableCollection<SuggestedReply> SuggestedReplies { get; } = [];
 
@@ -44,16 +63,17 @@ public sealed class ChatViewModel :
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
 
     public string InputText
+{
+    get => _inputText;
+    set
     {
-        get => _inputText;
-        set
-        {
-            if (!SetProperty(ref _inputText, value))
-                return;
+        if (!SetProperty(ref _inputText, value))
+            return;
 
-            ((Command)SendCommand).ChangeCanExecute();
-        }
+        NotifySendButtonStateChanged();
+        ((Command)SendCommand).ChangeCanExecute();
     }
+}
 
     public string Status
     {
@@ -62,19 +82,30 @@ public sealed class ChatViewModel :
     }
 
     public bool IsBusy
+{
+    get => _isBusy;
+    private set
     {
-        get => _isBusy;
-        private set
-        {
-            if (!SetProperty(ref _isBusy, value))
-                return;
+        if (!SetProperty(ref _isBusy, value))
+            return;
 
-            OnPropertyChanged(nameof(IsNotBusy));
-            ((Command)SendCommand).ChangeCanExecute();
-            ((Command)CancelCommand).ChangeCanExecute();
-            ((Command<SuggestedReply>)SuggestedReplyCommand).ChangeCanExecute();
-        }
+        OnPropertyChanged(nameof(IsNotBusy));
+        NotifySendButtonStateChanged();
+
+        ((Command)SendCommand).ChangeCanExecute();
+        ((Command)CancelCommand).ChangeCanExecute();
+        ((Command<SuggestedReply>)SuggestedReplyCommand)
+            .ChangeCanExecute();
     }
+}
+
+private void NotifySendButtonStateChanged()
+{
+    OnPropertyChanged(nameof(CanSend));
+    OnPropertyChanged(nameof(SendButtonBorderColor));
+    OnPropertyChanged(nameof(SendButtonBackgroundColor));
+    OnPropertyChanged(nameof(SendButtonIconColor));
+}
 
     public bool IsNotBusy => !IsBusy;
 
@@ -84,10 +115,12 @@ public sealed class ChatViewModel :
 
     public ChatViewModel(
         IChatService chatService,
-        IStreamingMarkdownService markdownService)
+        IStreamingMarkdownService markdownService,
+        IChatMessageActionService messageActionService)
     {
         _chatService = chatService;
         _markdownService = markdownService;
+        _messageActionService = messageActionService;
 
         SendCommand = new Command(
             async () => await SendAsync(),
@@ -123,7 +156,7 @@ public sealed class ChatViewModel :
 
         InputText = string.Empty;
 
-        var userMessage = new ChatMessageViewModel(ChatMessageRole.User)
+        var userMessage = new ChatMessageViewModel(ChatMessageRole.User,_messageActionService)
         {
             Text = messageText,
             MarkdownSession = _markdownService.CreateSession()
@@ -134,13 +167,11 @@ public sealed class ChatViewModel :
 
         Messages.Add(userMessage);
 
-        var assistantMessage =
-    new ChatMessageViewModel(ChatMessageRole.Assistant)
-    {
-        IsStreaming = true,
-        MarkdownSession =
-                _markdownService.CreateSession()
-    };
+        var assistantMessage = new ChatMessageViewModel(ChatMessageRole.Assistant, _messageActionService)
+        {
+            IsStreaming = true,
+            MarkdownSession = _markdownService.CreateSession()
+        };
 
         Messages.Add(assistantMessage);
         _activeAssistantMessage = assistantMessage;
@@ -161,8 +192,11 @@ public sealed class ChatViewModel :
 
                 // Append through the session API; MarkdownView observes
                 // the session and handles rendering.
-                await MainThread.InvokeOnMainThreadAsync(
-                    () => assistantMessage.MarkdownSession!.Append(chunk));
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    assistantMessage.Text += chunk;
+                    assistantMessage.MarkdownSession!.Append(chunk);
+                });
             }
 
             token.ThrowIfCancellationRequested();

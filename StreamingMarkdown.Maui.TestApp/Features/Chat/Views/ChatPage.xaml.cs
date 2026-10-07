@@ -81,4 +81,5 @@ public partial class ChatPage : ContentPage
             SuggestedRepliesLayout.Children.Add(button);
         }
     }
+
 }

@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:selector="clr-namespace:StreamingMarkdown.Maui.TestApp.Features.Chat.Selectors"
     xmlns:templates="clr-namespace:StreamingMarkdown.Maui.TestApp.Features.Chat.Templates"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     x:Class="StreamingMarkdown.Maui.TestApp.Features.Chat.Views.ChatPage"
     Title="Chat"
     HideSoftInputOnTapped="True"
@@ -110,13 +111,13 @@
                     TextColor="#1E293B"
                     PlaceholderColor="#94A3B8" />
 
-                <Label
+                <!-- <Label
                     Grid.Row="1"
                     Grid.Column="0" FontFamily="RobotoBold" FontAttributes="Italic"
                     Text="{Binding Status}"
                     FontSize="12"
                     TextColor="#64748B"
-                    VerticalOptions="Center" />
+                    VerticalOptions="Center" /> -->
 
                 <HorizontalStackLayout
                     Grid.Row="1"
@@ -132,16 +133,48 @@
                         BackgroundColor="#F1F5F9"
                         TextColor="#334155" />
 
-                    <Button
-                        Text="↑"
-                        FontAttributes="Bold"
-                        Command="{Binding SendCommand}"
-                        IsEnabled="{Binding IsNotBusy}"
-                        CornerRadius="18"
-                        BackgroundColor="#1769D2"
-                        TextColor="White" />
+                    
+<Grid WidthRequest="36"
+      HeightRequest="36">
+
+    <!-- Circular send button appearance -->
+    <Border
+        Stroke="{Binding SendButtonBorderColor}"
+        StrokeThickness="1"
+        BackgroundColor="{Binding SendButtonBackgroundColor}"
+        StrokeShape="RoundRectangle 18"
+        Padding="0">
+
+        <Image
+            Source="arrow_up.svg"
+            WidthRequest="16"
+            HeightRequest="16"
+            HorizontalOptions="Center"
+            VerticalOptions="Center">
+
+            <Image.Behaviors>
+                <toolkit:IconTintColorBehavior
+                    BindingContext="{Binding BindingContext,
+                        Source={x:Reference SendButton}}"
+                    TintColor="{Binding SendButtonIconColor}" />
+            </Image.Behaviors>
+        </Image>
+    </Border>
+
+    <!-- Transparent button provides the tap target -->
+    <Button
+        x:Name="SendButton"
+        Text=""
+        BackgroundColor="Transparent"
+        BorderWidth="0"
+        Padding="0"
+        CornerRadius="26"
+        Command="{Binding SendCommand}"
+        IsEnabled="{Binding CanSend}" />
+</Grid>
                 </HorizontalStackLayout>
             </Grid>
         </Border>
     </Grid>
+
 </ContentPage>

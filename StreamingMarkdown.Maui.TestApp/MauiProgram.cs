@@ -6,6 +6,8 @@ using StreamingMarkdown.Maui.TestApp.Features.Chat.Views;
 using StreamingMarkdown.Maui.TestApp.ViewModels;
 using StreamingMarkdown.Maui.TestApp.Views;
 using StreamingMarkdown.Maui.Styling;
+using CommunityToolkit.Maui;
+using Microsoft.Maui.Handlers;
 
 namespace StreamingMarkdown.Maui.TestApp;
 
@@ -27,6 +29,7 @@ public static class MauiProgram
 				fonts.AddFont("Roboto-SemiBold.ttf", "RobotoSemiBold");
 				fonts.AddFont("Roboto-BoldItalic.ttf", "RobotoBoldItalic");
 			})
+			.UseMauiCommunityToolkit()
 			.UseStreamingMarkdown(options =>
 			{
 				options.FontFamily="RobotoRegular";
@@ -43,8 +46,24 @@ public static class MauiProgram
 		builder.Services.AddTransient<StreamingMarkdownTestPage>();
 		builder.Services.AddTransient<StreamingMarkdownTestViewModel>();
 		builder.Services.AddSingleton<IChatService, MockChatService>();
+		builder.Services.AddSingleton<IChatMessageActionService,LocalChatMessageActionService>();
 		builder.Services.AddTransient<ChatViewModel>();
 		builder.Services.AddTransient<ChatPage>();
+		builder.Services.ConfigureMauiHandlers(handlers =>
+		{
+#if ANDROID
+			EntryHandler.Mapper.AppendToMapping("NoUnderline", (handler, view) =>
+			{
+				handler.PlatformView.BackgroundTintList=Android.Content.Res.ColorStateList.ValueOf(Android.Graphics.Color.Transparent);
+			});
+#elif IOS || MACCATALYST
+            EntryHandler.Mapper.AppendToMapping("NoBorder", (handler, view) =>
+            {
+                handler.PlatformView.BorderStyle =
+                    UIKit.UITextBorderStyle.None;
+            });
+#endif
+		});
 
 #if DEBUG
 		builder.Logging.AddDebug();

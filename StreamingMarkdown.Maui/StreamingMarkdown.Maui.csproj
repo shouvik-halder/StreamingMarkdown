@@ -7,6 +7,8 @@
     <SingleProject>true</SingleProject>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <RootNamespace>StreamingMarkdown.Maui</RootNamespace>
+    <AssemblyName>StreamingMarkdown.Maui</AssemblyName>
 
     <MauiXamlInflator>SourceGen</MauiXamlInflator>
 
